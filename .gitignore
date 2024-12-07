@@ -47,3 +47,42 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+# R specific
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.Rproj
+
+# Configuration and secrets
+config.yml
+.secrets/
+*.json
+.Renviron
+.httr-oauth
+
+# Temporary and cache files
+cache/
+temp/
+*.pdf
+pdf_uploads/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# IDE specific
+.vscode/
+.idea/
+
+# Logs
+*.log
+logs/
+
+# Package specific
+packrat/
+renv/
+
+# Temporary R files
+*.rds

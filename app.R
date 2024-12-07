@@ -17,7 +17,7 @@ library(yaml)
 # Load configuration from the parent directory
 config <- yaml::read_yaml(file = "config.yml")  # Adjusted path to config.yml
 
-# UI Definition
+# UI Definition ----
 ui <- dashboardPage(
   skin = "blue",
   
@@ -42,7 +42,7 @@ ui <- dashboardPage(
   )
 ),
   
-  # Main content
+  ## CSS ----
   dashboardBody(
     useShinyjs(),
     tags$head(
@@ -183,7 +183,7 @@ ui <- dashboardPage(
     use_waiter(),
     
     tabItems(
-    
+    ##Main Page ----
     tabItem("Start",
             
             
@@ -293,7 +293,7 @@ ui <- dashboardPage(
             ),
     ),
 
-      
+      ## Analysis ----
     tabItem("Analyze",
       fluidRow(
       # PDF Preview on the left
@@ -343,7 +343,7 @@ ui <- dashboardPage(
 )
 )
 
-# Server logic
+# Server logic ----
 server <- function(input, output, session) {
   # Initialize reactive values
   rv <- reactiveValues(
@@ -381,150 +381,7 @@ server <- function(input, output, session) {
     }
   })
   
-  # API key validation
-  observeEvent(input$validateKey, {
-    req(input$apiKey)
-    
-    # Update button to loading state
-    validationStatus("loading")
-    updateActionButton(session, "validateKey",
-                       label = "Validating...",
-                       icon = icon("spinner", class = "fa-spin"))
-    
-    # Show loading notification
-    id <- showNotification(
-      "Validating API key...", 
-      type = "default",  # Changed from "message" to "default"
-      duration = NULL,
-      closeButton = FALSE
-    )
-    
-    # Validate the API key using a simple test request
-    tryCatch({
-      response <- httr::POST(
-        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent",
-        httr::add_headers(
-          "Content-Type" = "application/json"
-        ),
-        query = list(
-          key = input$apiKey
-        ),
-        body = jsonlite::toJSON(list(
-          contents = list(
-            list(
-              parts = list(
-                list(text = "Test")
-              )
-            )
-          )
-        ), auto_unbox = TRUE)
-      )
-      
-      # Check response
-      if (httr::status_code(response) == 200) {
-        removeNotification(id)
-        validationStatus("success")
-        updateActionButton(session, "validateKey",
-                           label = "",
-                           icon = icon("check"))
-        runjs("$('#validateKey').addClass('validate-btn-success');")
-        showNotification(
-          "API key is valid!", 
-          type = "default",  # Changed from "success" to "default"
-          duration = 5
-        )
-      } else {
-        removeNotification(id)
-        validationStatus("failed")
-        updateActionButton(session, "validateKey",
-                           label = "Validate Key",
-                           icon = icon("check"))
-        runjs("$('#validateKey').removeClass('validate-btn-success');")
-        showNotification(
-          "Invalid API key. Please check and try again.", 
-          type = "error",
-          duration = 5
-        )
-      }
-    }, error = function(e) {
-      removeNotification(id)
-      validationStatus("failed")
-      updateActionButton(session, "validateKey",
-                         label = "Validate Key",
-                         icon = icon("check"))
-      runjs("$('#validateKey').removeClass('validate-btn-success');")
-      
-      # More detailed error handling
-      error_message <- if(grepl("Could not resolve host", e$message)) {
-        "Network error: Please check your internet connection"
-      } else if(grepl("timed out", e$message)) {
-        "Request timed out: Please try again"
-      } else {
-        "Error validating API key. Please try again"
-      }
-      
-      showNotification(
-        error_message,
-        type = "error",
-        duration = 5
-      )
-    })
-  })
-  
-  # Add this observer to reset button state when API key changes
-  observeEvent(input$apiKey, {
-    if(validationStatus() != "pending") {
-      validationStatus("pending")
-      updateActionButton(session, "validateKey",
-                         label = "Validate Key",
-                         icon = icon("check"))
-      runjs("$('#validateKey').removeClass('validate-btn-success');")
-    }
-  })
-  
-  
-  observeEvent(input$modelSelect, {
-    # Update rate limits when model changes
-    if(input$modelSelect == "gemini-1.5-flash") {
-      updateNumericInput(session, "requestsPerMinute", value = 15)
-      updateNumericInput(session, "requestsPerDay", value = 1500)
-    } else {
-      updateNumericInput(session, "requestsPerMinute", value = 2)
-      updateNumericInput(session, "requestsPerDay", value = 50)
-    }
-  })
-  
-  # Save settings
-  observeEvent(input$saveSettings, {
-    # Read the existing config while preserving comments and structure
-    current_config <- yaml::read_yaml("config.yml")
-    
-    # Only update the specific values we want to change
-    current_config$api$gemini$api_key <- input$apiKey
-    current_config$api$gemini$model <- input$modelSelect  # if you have model selection
-    current_config$api$gemini$rate_limits$requests_per_minute <- input$requestsPerMinute
-    current_config$api$gemini$rate_limits$requests_per_day <- input$requestsPerDay
-    
-    # Write back to file, preserving the structure
-    writeLines(
-      paste0(
-        "api:\n",
-        "  gemini:\n",
-        "    base_url: \"", "https://generativelanguage.googleapis.com/v1beta", "\"\n",
-        "    model: \"", current_config$api$gemini$model, "\"\n",
-        "    api_key: \"", current_config$api$gemini$api_key, "\"\n",
-        "    rate_limits:\n",
-        "      requests_per_minute: ", current_config$api$gemini$rate_limits$requests_per_minute, "\n", 
-        "      requests_per_day: ", current_config$api$gemini$rate_limits$requests_per_day,
-        "\n\n"
-      ),
-      "config.yml"
-    )
-    
-    showNotification("API Settings saved successfully", type = "message")
-  })
-  
-  # Handle file upload and reading
+  # Handle coding form upload and reading ----
   observeEvent(input$codingFormFile, {
     req(input$codingFormFile)
     
@@ -628,7 +485,7 @@ server <- function(input, output, session) {
     })
   })
   
-  # Clear responses and source information when new PDF is uploaded
+  ## Clear responses and source information when new PDF is uploaded ----
   observeEvent(input$pdfFile, {
     req(input$pdfFile)
     
@@ -655,10 +512,211 @@ server <- function(input, output, session) {
     
   }, priority = 1)
   
+  ## Load prompts from Excel file for coding form ----
+  observe({
+    req(input$codingFormFile)
+    tryCatch({
+      # Read Excel file
+      coding_form_df <- read_excel(input$codingFormFile$datapath, col_names = TRUE, sheet = 1, .name_repair = "unique")
+      # Adjust sheet index if necessary
+      print(str(coding_form_df))
+      # Debugging output to check the loaded Excel file
+      print("Loaded Excel Data:")
+      print(coding_form_df)  # Print the entire data frame to inspect
+      
+      # Force column extraction
+      prompts <- as.character(names(coding_form_df))
+      
+      print("Prompts found:")
+      print(prompts)
+      
+      if (length(prompts) > 0 && !all(is.na(prompts))) {
+        rv$prompts <- prompts
+      } else {
+        showNotification("No valid prompts found.", type = "error")
+      }
+    }, error = function(e) {
+      showNotification(paste("Excel reading error:", e$message), type = "error")
+    })
+  })
   
-  ######################################################
-  ##############Gemini calls############################
+  # Modify the renderUI for coding prompts
+  output$codingPrompts <- renderUI({
+    req(rv$prompts)
+    
+    # Generate UI elements for each prompt
+    prompts_ui <- lapply(seq_along(rv$prompts), function(i) {
+      prompt_text <- rv$prompts[i]
+      
+      div(
+        class = "coding-prompt",
+        h4(paste("Prompt", i, ":", prompt_text)),
+        
+        # Text entry box for the response
+        textAreaInput(
+          inputId = paste0("response_", i),
+          label = NULL,
+          value = "",
+          width = "100%"
+        ),
+        # Buttons for Source and Record
+        div(
+          class = "coding-buttons",
+          actionButton(inputId = paste0("source_", i), label = "Source", class = "btn-info"),
+          actionButton(inputId = paste0("record_", i), label = "Record", class = "btn-success")
+        ),
+        hr()
+      )
+    })
+    
+    do.call(tagList, prompts_ui)
+  })
   
+  #Gemini ----
+  ### Google API key validation ----
+  observeEvent(input$validateKey, {
+    req(input$apiKey)
+    
+    # Update button to loading state
+    validationStatus("loading")
+    updateActionButton(session, "validateKey",
+                       label = "Validating...",
+                       icon = icon("spinner", class = "fa-spin"))
+    
+    # Show loading notification
+    id <- showNotification(
+      "Validating API key...", 
+      type = "default",  # Changed from "message" to "default"
+      duration = NULL,
+      closeButton = FALSE
+    )
+    
+    # Validate the API key using a simple test request
+    tryCatch({
+      response <- httr::POST(
+        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent",
+        httr::add_headers(
+          "Content-Type" = "application/json"
+        ),
+        query = list(
+          key = input$apiKey
+        ),
+        body = jsonlite::toJSON(list(
+          contents = list(
+            list(
+              parts = list(
+                list(text = "Test")
+              )
+            )
+          )
+        ), auto_unbox = TRUE)
+      )
+      
+      # Check response
+      if (httr::status_code(response) == 200) {
+        removeNotification(id)
+        validationStatus("success")
+        updateActionButton(session, "validateKey",
+                           label = "",
+                           icon = icon("check"))
+        runjs("$('#validateKey').addClass('validate-btn-success');")
+        showNotification(
+          "API key is valid!", 
+          type = "default",  # Changed from "success" to "default"
+          duration = 5
+        )
+      } else {
+        removeNotification(id)
+        validationStatus("failed")
+        updateActionButton(session, "validateKey",
+                           label = "Validate Key",
+                           icon = icon("check"))
+        runjs("$('#validateKey').removeClass('validate-btn-success');")
+        showNotification(
+          "Invalid API key. Please check and try again.", 
+          type = "error",
+          duration = 5
+        )
+      }
+    }, error = function(e) {
+      removeNotification(id)
+      validationStatus("failed")
+      updateActionButton(session, "validateKey",
+                         label = "Validate Key",
+                         icon = icon("check"))
+      runjs("$('#validateKey').removeClass('validate-btn-success');")
+      
+      # More detailed error handling
+      error_message <- if(grepl("Could not resolve host", e$message)) {
+        "Network error: Please check your internet connection"
+      } else if(grepl("timed out", e$message)) {
+        "Request timed out: Please try again"
+      } else {
+        "Error validating API key. Please try again"
+      }
+      
+      showNotification(
+        error_message,
+        type = "error",
+        duration = 5
+      )
+    })
+  })
+  
+  ### Gemini observer to reset button state when API key changes ----
+  observeEvent(input$apiKey, {
+    if(validationStatus() != "pending") {
+      validationStatus("pending")
+      updateActionButton(session, "validateKey",
+                         label = "Validate Key",
+                         icon = icon("check"))
+      runjs("$('#validateKey').removeClass('validate-btn-success');")
+    }
+  })
+  
+  ### Gemini model selection observer----
+  observeEvent(input$modelSelect, {
+    # Update rate limits when model changes
+    if(input$modelSelect == "gemini-1.5-flash") {
+      updateNumericInput(session, "requestsPerMinute", value = 15)
+      updateNumericInput(session, "requestsPerDay", value = 1500)
+    } else {
+      updateNumericInput(session, "requestsPerMinute", value = 2)
+      updateNumericInput(session, "requestsPerDay", value = 50)
+    }
+  })
+  
+  ### Gemini Save settings ----
+  observeEvent(input$saveSettings, {
+    # Read the existing config while preserving comments and structure
+    current_config <- yaml::read_yaml("config.yml")
+    
+    # Only update the specific values we want to change
+    current_config$api$gemini$api_key <- input$apiKey
+    current_config$api$gemini$model <- input$modelSelect  # if you have model selection
+    current_config$api$gemini$rate_limits$requests_per_minute <- input$requestsPerMinute
+    current_config$api$gemini$rate_limits$requests_per_day <- input$requestsPerDay
+    
+    ### Gemini write config.yml ----
+    writeLines(
+      paste0(
+        "api:\n",
+        "  gemini:\n",
+        "    base_url: \"", "https://generativelanguage.googleapis.com/v1beta", "\"\n",
+        "    model: \"", current_config$api$gemini$model, "\"\n",
+        "    api_key: \"", current_config$api$gemini$api_key, "\"\n",
+        "    rate_limits:\n",
+        "      requests_per_minute: ", current_config$api$gemini$rate_limits$requests_per_minute, "\n", 
+        "      requests_per_day: ", current_config$api$gemini$rate_limits$requests_per_day,
+        "\n\n"
+      ),
+      "config.yml"
+    )
+    
+    showNotification("API Settings saved successfully", type = "message")
+  })
+  
+  #### Gemini calls ----
   analyze_with_gemini <- function(pdf_text, prompts, config, progress_callback = NULL) {
     if (is.null(pdf_text) || length(pdf_text) == 0) {
       stop("PDF text is empty or null")
@@ -833,7 +891,7 @@ server <- function(input, output, session) {
   
   
   
-  #analyze button
+  #Gemini analyze button
   observeEvent(input$analyzeBtn, {
     # Debug prints to check values
     print("Analyze button pressed")
@@ -986,70 +1044,8 @@ server <- function(input, output, session) {
     })
   })
   
-  ######################################################
-  ######################################################
-  # Load prompts from Excel file for coding form
-  observe({
-    req(input$codingFormFile)
-    tryCatch({
-      # Read Excel file
-      coding_form_df <- read_excel(input$codingFormFile$datapath, col_names = TRUE, sheet = 1, .name_repair = "unique")
-      # Adjust sheet index if necessary
-      print(str(coding_form_df))
-      # Debugging output to check the loaded Excel file
-      print("Loaded Excel Data:")
-      print(coding_form_df)  # Print the entire data frame to inspect
-      
-      # Force column extraction
-      prompts <- as.character(names(coding_form_df))
-      
-      print("Prompts found:")
-      print(prompts)
-      
-      if (length(prompts) > 0 && !all(is.na(prompts))) {
-        rv$prompts <- prompts
-      } else {
-        showNotification("No valid prompts found.", type = "error")
-      }
-    }, error = function(e) {
-      showNotification(paste("Excel reading error:", e$message), type = "error")
-    })
-  })
   
-  # Modify the renderUI for coding prompts
-  output$codingPrompts <- renderUI({
-    req(rv$prompts)
-    
-    # Generate UI elements for each prompt
-    prompts_ui <- lapply(seq_along(rv$prompts), function(i) {
-      prompt_text <- rv$prompts[i]
-      
-      div(
-        class = "coding-prompt",
-        h4(paste("Prompt", i, ":", prompt_text)),
-        
-        # Text entry box for the response
-        textAreaInput(
-          inputId = paste0("response_", i),
-          label = NULL,
-          value = "",
-          width = "100%"
-        ),
-        # Buttons for Source and Record
-        div(
-          class = "coding-buttons",
-          actionButton(inputId = paste0("source_", i), label = "Source", class = "btn-info"),
-          actionButton(inputId = paste0("record_", i), label = "Record", class = "btn-success")
-        ),
-        hr()
-      )
-    })
-    
-    do.call(tagList, prompts_ui)
-  })
-  
-  
-  # Dynamic observers for source buttons
+  ## Dynamic observers for source buttons ----
   observe({
     for (i in seq_along(rv$prompts)) {
       local({
@@ -1199,7 +1195,7 @@ server <- function(input, output, session) {
   })
   
   
-  # Handle PDF upload
+  ## Handle PDF upload ----
   observeEvent(input$pdfFile, {
     req(input$pdfFile)
     
@@ -1378,7 +1374,7 @@ server <- function(input, output, session) {
     })
   })
   
-  # Display all PDF pages as images
+  ## Display all PDF pages as images ----
   output$pdfImage <- renderUI({
     req(rv$pdf_images)
     req(rv$image_timestamp)

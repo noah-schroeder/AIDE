@@ -245,8 +245,10 @@ ui <- dashboardPage(
                 div(
                   style = "margin-top: -5px;", # Negative margin to reduce space
                   h4(style = "margin: 0 0 2px 0;", "Rate Limits"), # Reduced margins
-                  p(style = "margin: 0 0 5px 0; font-size: 0.9em;", # Reduced margins and slightly smaller text
-                    "Note: The default rate limits are the maximum of the free tier.")
+                  p(style = "margin: 0 0 5px 0", # Reduced margins and slightly smaller text
+                    "**Important Notes**"),
+                  p(style = "margin: 0 0 5px 0", "1. Each prompt is its own API call. So if you are coding 40 variables per study, that is 40 API calls per PDF. For this reason Gemini 1.5 Flash is recommended as you will likely hit rate limits quickly on Gemini 1.5 Pro as of the current (December 2024) rate limits.",),
+                    p(style = "margin: 0 0 5px 0", "2. The default rate limits are the maximum of the free tier as of December 2024. You can check current rate limits for the free tier here:", HTML('<a href="https://ai.google.dev/pricing" target="_blank" style="display: inline;">Google AI API Pricing.</a>')),
                 ),
                 div(
                   style = "display: flex; gap: 10px; margin-top: -5px;", # Added negative top margin

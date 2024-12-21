@@ -176,6 +176,27 @@ ui <- dashboardPage(
         cursor: not-allowed !important;
         opacity: 0.6;
       }
+      
+      #download-status {  
+        text-align: center;  
+        font-weight: bold;  
+        margin-top: 10px;  
+        color: #333;  
+      } 
+      #layer-status {  
+      max-height: 150px;  
+      overflow-y: auto;  
+      padding: 10px;  
+      background-color: #f8f9fa;  
+      border: 1px solid #dee2e6;  
+      border-radius: 4px;  
+      margin-top: 10px;  
+    }  
+    #layer-status div {  
+      margin-bottom: 5px;  
+      font-family: monospace;  
+    }  
+
      "))
     ),
     
@@ -206,9 +227,29 @@ ui <- dashboardPage(
                 p("7) When ready to work on the next PDF, simply upload a new one and the coding form will reset."),
                 ),
             ),
+            
+            # New LLM Method Selection Box  
+            box(  
+              width = 12,  
+              title = "LLM Method",  
+              div(  
+                style = "display: flex; flex-direction: column; gap: 8px;",  
+                p("Choose the way you would like to interact with LLMs"),
+                selectInput("llmMethod", "",  
+                            choices = c("Google Gemini API", "Mistral API"),  
+                            selected = "Google Gemini API",  
+                            width = "100%"),  
+              )
+            ),  
+            
+            # Conditional UI boxes based on LLM Method selection  
+            #Gemini selection ----
+            conditionalPanel(  
+              condition = "input.llmMethod == 'Google Gemini API'",  
+              #Gemini API settings
             box(
               width = 6,
-              title = "API Settings",
+              title = "Gemini API Settings",
               div(
                 style = "display: flex; flex-direction: column; gap: 8px;", # Reduced from 15px to 8px
                   # API Key input with validate button
@@ -280,6 +321,57 @@ ui <- dashboardPage(
             )
               ),
             ),
+            ),
+            #Mistral selection ----
+            conditionalPanel(    
+              condition = "input.llmMethod == 'Mistral API'",    
+              box(    
+                width = 6,    
+                title = "Mistral API Settings",    
+                div(    
+                  style = "display: flex; flex-direction: column; gap: 8px;",    
+                  # API Key input with validate button
+                  div(
+                    style = "display: flex; gap: 10px;",
+                    textInput("apiKeyMistral", "API Key", 
+                              value = tryCatch({
+                                config <- yaml::read_yaml(file = "config.yml")
+                                config$api$mistral$api_key
+                              }, error = function(e) {
+                                cat("Error accessing config:", e$message, "\n")
+                                ""
+                              }),
+                              width = "400px"),
+                    tags$div(
+                      style = "margin-top: 25px;",  # Adjust this value to align perfectly
+                      actionButton("validateKeyMistral", 
+                                   label = "Validate Key",
+                                   icon = icon("check"),
+                                   class = "validate-btn")
+                    )
+                  ),
+                  # Model selection
+                  selectInput("modelSelectMistral", "Model",
+                              choices = c("pixtral-large-latest", "mistral-large-latest"),
+                              selected = tryCatch({
+                                fresh_config <- yaml::read_yaml(file = "config.yml")
+                                fresh_config$api$gemini$model
+                              }, error = function(e) {
+                                "pixtral-large-latest"
+                              }),
+                              width = "400px"),
+                  
+                  
+                  # Save Settings Button    
+                  uiOutput("containerStatus"),  
+                  
+                  actionButton("saveMistralSettings", "Save Settings",     
+                               icon = icon("save"),    
+                               style = "color: #fff; background-color: #337ab7; border-color: #2e6da4")    
+                )    
+              )    
+            ),   
+            
     
             # Upload Coding Form Button
             box(
@@ -363,8 +455,11 @@ server <- function(input, output, session) {
     pages = list(),
     codingForm = NULL,
   )
+  mistral_key_valid <- reactiveVal(FALSE)
   current_row <- reactiveVal(NULL)
   validationStatus <- reactiveVal("pending") # Can be "pending", "success", or "failed"
+  # Reactive value to track Mistral validation status
+  validationStatusMistral <- reactiveVal("initial")
   # Save Properly
   original_file_path <- reactiveVal(NULL)
   #control analyze button state:
@@ -892,7 +987,7 @@ server <- function(input, output, session) {
   
   
   
-  
+  #Analyze Button----
   #Gemini analyze button
   observeEvent(input$analyzeBtn, {
     # Debug prints to check values
@@ -901,6 +996,11 @@ server <- function(input, output, session) {
     print(str(rv$pdf_text))
     print("Prompts status:")
     print(str(rv$prompts))
+    
+    # Choose the appropriate analysis function based on selected LLM  
+    analysis_function <- switch(input$llmMethod,  
+                                "Google Gemini API" = analyze_with_gemini,  
+                                "Mistral API" = analyze_with_mistral)
     
     # Reset previous results with empty lists
     rv$sources <- list()
@@ -926,7 +1026,7 @@ server <- function(input, output, session) {
       showNotification("No prompts found. Please upload a valid coding form.", type = "warning")
       return()
     }
-    
+
     # Create and show a modal dialog with progress
     showModal(modalDialog(
       title = NULL,
@@ -961,18 +1061,18 @@ server <- function(input, output, session) {
       
       total_prompts <- length(rv$prompts)
       
-      responses <- analyze_with_gemini(
-        pdf_text = rv$pdf_text,
-        prompts = rv$prompts,
-        config = config,
-        progress_callback = function(current, total) {
-          # Update progress bar
-          progress_pct <- (current/total) * 100
-          runjs(sprintf("
-          $('.progress-bar').css('width', '%s%%');
-          $('#progress-detail').text('Processing prompt %d of %d');
-        ", progress_pct, current, total))
-        }
+      responses <- analysis_function(  
+        pdf_text = rv$pdf_text,  
+        prompts = rv$prompts,  
+        config = config,  
+        progress_callback = function(current, total) {  
+          # Update progress bar  
+          progress_pct <- (current/total) * 100  
+          runjs(sprintf("  
+          $('.progress-bar').css('width', '%s%%');  
+          $('#progress-detail').text('Processing prompt %d of %d');  
+        ", progress_pct, current, total))  
+        }  
       )
       
       # Debug print responses
@@ -1407,6 +1507,355 @@ server <- function(input, output, session) {
     
     do.call(tagList, image_tags)
   })
+  
+  
+  #Mistral ----
+  
+  ### Mistral API key validation ----
+  observeEvent(input$validateKeyMistral, {
+    req(input$apiKeyMistral)
+    req(input$modelSelectMistral)
+    
+    # Update button to loading state
+    validationStatusMistral("loading")
+    updateActionButton(session, "validateKeyMistral",
+                       label = "Validating...",
+                       icon = icon("spinner", class = "fa-spin"))
+    
+    # Show loading notification
+    id <- showNotification(
+      "Validating API key...", 
+      type = "default",
+      duration = NULL,
+      closeButton = FALSE
+    )
+    
+    # Validate the API key using a simple test request
+    tryCatch({
+      response <- httr::POST(
+        url = "https://api.mistral.ai/v1/chat/completions",
+        httr::add_headers(
+          "Authorization" = paste("Bearer", input$apiKeyMistral),
+          "Content-Type" = "application/json"
+        ),
+        body = jsonlite::toJSON(list(
+          model = input$modelSelectMistral,
+          messages = list(
+            list(
+              role = "user",
+              content = "Test API connection"
+            )
+          ),
+          max_tokens = 10  # Minimal response to speed up test
+        ), auto_unbox = TRUE),
+        httr::timeout(10)  # 10-second timeout
+      )
+      
+      # Check response
+      if (httr::status_code(response) == 200) {
+        removeNotification(id)
+        validationStatusMistral("success")
+        updateActionButton(session, "validateKeyMistral",
+                           label = "",
+                           icon = icon("check"))
+        
+        # More explicit JS to add success class and style
+        runjs("
+        $('#validateKeyMistral').addClass('validate-btn-success');
+        $('#validateKeyMistral').css({
+          'background-color': '#28a745',
+          'color': 'white',
+          'border-color': '#28a745'
+        });
+      ")
+        
+        showNotification(
+          "API key is valid!", 
+          type = "default",
+          duration = 5
+        )
+      } else {
+        removeNotification(id)
+        validationStatusMistral("failed")
+        updateActionButton(session, "validateKeyMistral",
+                           label = "Validate Key",
+                           icon = icon("check"))
+        
+        # Reset button style
+        runjs("
+        $('#validateKeyMistral').removeClass('validate-btn-success');
+        $('#validateKeyMistral').css({
+          'background-color': '',
+          'color': '',
+          'border-color': ''
+        });
+      ")
+        
+        # Try to get more information about the error
+        error_content <- tryCatch(
+          httr::content(response, "text", encoding = "UTF-8"),
+          error = function(e) "Unable to parse error response"
+        )
+        
+        showNotification(
+          paste("Invalid API key. Status:", httr::status_code(response), 
+                "Response:", error_content), 
+          type = "error",
+          duration = 5
+        )
+      }
+    }, error = function(e) {
+      removeNotification(id)
+      validationStatusMistral("failed")
+      updateActionButton(session, "validateKeyMistral",
+                         label = "Validate Key",
+                         icon = icon("check"))
+      
+      # Reset button style
+      runjs("
+      $('#validateKeyMistral').removeClass('validate-btn-success');
+      $('#validateKeyMistral').css({
+        'background-color': '',
+        'color': '',
+        'border-color': ''
+      });
+    ")
+      
+      # More detailed error handling
+      error_message <- if(inherits(e, "error")) {
+        if(grepl("Could not resolve host", e$message)) {
+          "Network error: Please check your internet connection"
+        } else if(grepl("Operation timed out", e$message)) {
+          "Request timed out. Please check your internet connection and try again."
+        } else {
+          paste("Error validating API key:", e$message)
+        }
+      } else {
+        "An unknown error occurred"
+      }
+      
+      showNotification(
+        error_message,
+        type = "error",
+        duration = 5
+      )
+    })
+  })
+
+  ##Mistral Analysis----
+  analyze_with_mistral <- function(pdf_text, prompts, config, progress_callback = NULL) {
+    # Existing validation checks
+    if (is.null(pdf_text) || length(pdf_text) == 0) {
+      stop("PDF text is empty or null")
+    }
+    if (is.null(prompts) || length(prompts) == 0) {
+      stop("Prompts are empty or null")
+    }
+    
+    print("Starting Mistral analysis")
+    print(paste("Number of prompts:", length(prompts)))
+    print(paste("PDF text length:", length(pdf_text)))
+    
+    # Configuration extraction with more robust error checking
+    base_url <- tryCatch(
+      config$api$mistral$base_url, 
+      error = function(e) stop("Mistral base URL not found in configuration")
+    )
+    model <- tryCatch(
+      config$api$mistral$model, 
+      error = function(e) stop("Mistral model not found in configuration")
+    )
+    api_key <- tryCatch(
+      config$api$mistral$api_key, 
+      error = function(e) stop("Mistral API key not found in configuration")
+    )
+    
+    # Validate configuration
+    if (is.null(base_url) || is.null(model) || is.null(api_key)) {
+      stop("Missing required configuration values for Mistral")
+    }
+    
+    # Rate limiting
+    requests_per_minute <- tryCatch({
+      rpm <- as.numeric(config$api$mistral$rate_limits$requests_per_minute)
+      if (is.na(rpm) || rpm <= 0) 15 else rpm
+    }, error = function(e) {
+      print("Using default rate limit of 15 requests per minute")
+      15
+    })
+    
+    sleep_time <- 60/requests_per_minute
+    url <- sprintf("%s/chat/completions", base_url)
+    
+    # Process individual prompt
+    process_prompt <- function(prompt, sleep_time, url, api_key, pdf_text) {
+      Sys.sleep(sleep_time)
+      print(sprintf("Processing prompt: %s", prompt))
+      
+      # Construct payload with more detailed system prompt
+      payload <- list(
+        model = model,
+        messages = list(
+          list(
+            role = "system", 
+            content = "You are an expert PDF analyzer. Follow these strict guidelines:"
+          ),
+          list(
+            role = "user", 
+            content = sprintf("Analyze this PDF and answer the following prompt. You MUST provide both an answer AND a source for every response.
+
+        IMPORTANT: For each response, you MUST use this EXACT format:
+        ANSWER: [your answer here]
+        SOURCE: [copy and paste the EXACT supporting text from the PDF]
+        PAGE: [specify which page number this text appears on]
+
+        If you cannot find a specific source in the PDF, respond with:
+        ANSWER: [your answer here]
+        SOURCE: [explain why you answered the way you did. Start with the phrase, I drew this conclusion because]
+        PAGE: N/A
+
+        PDF text:
+        %s
+
+        Prompt: %s", 
+                              paste(pdf_text, collapse = "\n"), 
+                              prompt)
+          )
+        ),
+        temperature = 0.1,
+        max_tokens = 2048
+      )
+      
+      tryCatch({
+        # Perform API call
+        response <- httr::POST(
+          url = url,
+          body = jsonlite::toJSON(payload, auto_unbox = TRUE),
+          httr::add_headers(
+            "Content-Type" = "application/json",
+            "Authorization" = paste("Bearer", api_key)
+          ),
+          encode = "json"
+        )
+        
+        # Check response status
+        if (httr::status_code(response) != 200) {
+          stop(sprintf("API call failed with status code %d", httr::status_code(response)))
+        }
+        
+        # Debugging: print raw content
+        content <- httr::content(response, "text", encoding = "UTF-8")
+        print("Raw API response:")
+        print(content)
+        
+        # Parse JSON manually with error handling
+        parsed <- tryCatch(
+          jsonlite::fromJSON(content, simplifyDataFrame = TRUE, simplifyVector = TRUE),
+          error = function(e) {
+            print("JSON parsing error:")
+            print(e)
+            return(NULL)
+          }
+        )
+        
+        # More robust response extraction
+        if (!is.null(parsed)) {
+          tryCatch({
+            # Extract content directly from the choices data frame
+            response_text <- parsed$choices$message$content
+            
+            # If response_text is NULL or empty, try alternative extraction
+            if (is.null(response_text) || response_text == "") {
+              response_text <- parsed$choices$message$content[1]
+            }
+            
+            print("Raw response from Mistral:")
+            print(response_text)
+            
+            # Regex extraction with more flexible matching
+            answer_match <- regexpr("ANSWER:\\s*(.*?)(?=\\s*SOURCE:|\\s*PAGE:|$)", response_text, perl = TRUE)
+            source_match <- regexpr("SOURCE:\\s*(.*?)(?=\\s*PAGE:|$)", response_text, perl = TRUE)
+            page_match <- regexpr("PAGE:\\s*(.*?)$", response_text, perl = TRUE)
+            
+            # Extraction functions with additional error handling
+            answer <- if(answer_match > 0) {
+              trimws(substr(response_text, 
+                            answer_match + attr(answer_match, "match.length") - attr(answer_match, "capture.length"),
+                            answer_match + attr(answer_match, "match.length")))
+            } else {
+              # Try to extract everything before SOURCE or PAGE
+              matches <- regmatches(response_text, gregexpr("ANSWER:\\s*(.*?)(?=\\s*SOURCE:|\\s*PAGE:|$)", response_text, perl = TRUE))
+              if (length(matches[[1]]) > 0) trimws(matches[[1]][1]) else response_text
+            }
+            
+            source <- if(source_match > 0) {
+              trimws(substr(response_text,
+                            source_match + attr(source_match, "match.length") - attr(source_match, "capture.length"),
+                            source_match + attr(source_match, "match.length")))
+            } else {
+              # Try to extract text between SOURCE: and PAGE:
+              matches <- regmatches(response_text, gregexpr("SOURCE:\\s*(.*?)(?=\\s*PAGE:|$)", response_text, perl = TRUE))
+              if (length(matches[[1]]) > 0) trimws(matches[[1]][1]) else NULL
+            }
+            
+            page <- if(page_match > 0) {
+              trimws(substr(response_text,
+                            page_match + attr(page_match, "match.length") - attr(page_match, "capture.length"),
+                            page_match + attr(page_match, "match.length")))
+            } else {
+              # Try to extract text after PAGE:
+              matches <- regmatches(response_text, gregexpr("PAGE:\\s*(.*?)$", response_text, perl = TRUE))
+              if (length(matches[[1]]) > 0) trimws(matches[[1]][1]) else "N/A"
+            }
+            
+            return(list(
+              answer = answer,
+              source = source,
+              page = page
+            ))
+          }, error = function(e) {
+            print("Error extracting response content:")
+            print(e)
+            return(list(
+              answer = "Error extracting response",
+              source = NULL,
+              page = NULL
+            ))
+          })
+        } else {
+          # More informative error message
+          print("Unexpected response structure from Mistral API")
+          return(list(
+            answer = "Error: Unexpected response from Mistral API",
+            source = NULL,
+            page = NULL
+          ))
+        }
+        
+      }, error = function(e) {
+        print(sprintf("Mistral API call error: %s", e$message))
+        return(list(
+          answer = sprintf("Error: %s", e$message),
+          source = NULL,
+          page = NULL
+        ))
+      })
+    }
+    
+    # Process all prompts
+    responses <- lapply(seq_along(prompts), function(i) {
+      if (!is.null(progress_callback)) {
+        progress_callback(i, length(prompts))
+      }
+      process_prompt(prompts[i], sleep_time, url, api_key, pdf_text)
+    })
+    
+    return(responses)
+  }
+
+
+  
+  
 }
 # Run the Shiny app
 shinyApp(ui = ui, server = server)

@@ -13,6 +13,7 @@ library(base64enc)
 library(writexl)
 library(readxl)
 library(yaml)
+library(base64enc)
 
 # Load configuration from the parent directory
 config <- yaml::read_yaml(file = "config.yml")  # Adjusted path to config.yml
@@ -36,11 +37,11 @@ ui <- dashboardPage(
   # Sidebar
   dashboardSidebar(
     sidebarMenu(
-    menuItem("Start Here", tabName = "Start"),
-    menuItem("Analyze", tabName = "Analyze"),
-    menuItem("Cite", tabName = "Cite")
-  )
-),
+      menuItem("Start Here", tabName = "Start"),
+      menuItem("Analyze", tabName = "Analyze"),
+      menuItem("Cite", tabName = "Cite")
+    )
+  ),
   
   ## CSS ----
   dashboardBody(
@@ -204,237 +205,257 @@ ui <- dashboardPage(
     use_waiter(),
     
     tabItems(
-    ##Main Page ----
-    tabItem("Start",
-            
-            
-            
-            # UI component
-            box(
-              width = 12,
-              title = "Welcome to AI-Assisted Data Extraction (AIDE)",
-              div(
-                style = "display: flex; flex-direction: column; gap: 8px;", # Reduced from 15px to 8px
-                p("AIDE was developed to greatly accelerate the data extraction process for systematic review and meta-analysis. It relies on you having a Google Gemini API key (which are free). It is brought to you by Noah Schroeder, Ph.D. of", HTML('<a href="https://www.learnmeta-analysis.com/" target="_blank" style="display: inline;">Learn Meta-Analysis LLC.</a>')),
-                h4("How to Use This App"),
-                p("1) Set up your API settings below. You can obtain a google API key here:", 
-                  HTML('<a href="https://aistudio.google.com/" target="_blank" style="display: inline;">Google AI Studio.</a>')),
-                p("2) Set up your coding form. Importantly, your first row will be read as prompts by the large language model. The accuracy of the LLM's responses will be influenced very strongly by your prompts. Better prompts = better results."),
-                p("3) Upload your coding form. Your coding form should be in Excel format for best results."),
-                p("4) Move to the analyze page and upload the PDF file you want to analyze."),
-                p("5) Click Analyze button. Your results will autofill under the appropriate prompt."),
-                p("6) Review each response. You can view the source information by clicking the Source button. You can record each result by clicking the record button. This will save it to your coding form on your local machine."),
-                p("7) When ready to work on the next PDF, simply upload a new one and the coding form will reset."),
-                ),
-            ),
-            
-            # New LLM Method Selection Box  
-            box(  
-              width = 12,  
-              title = "LLM Method",  
-              div(  
-                style = "display: flex; flex-direction: column; gap: 8px;",  
-                p("Choose the way you would like to interact with LLMs"),
-                selectInput("llmMethod", "",  
-                            choices = c("Google Gemini API", "Mistral API"),  
-                            selected = "Google Gemini API",  
-                            width = "100%"),  
-              )
-            ),  
-            
-            # Conditional UI boxes based on LLM Method selection  
-            #Gemini selection ----
-            conditionalPanel(  
-              condition = "input.llmMethod == 'Google Gemini API'",  
-              #Gemini API settings
-            box(
-              width = 6,
-              title = "Gemini API Settings",
-              div(
-                style = "display: flex; flex-direction: column; gap: 8px;", # Reduced from 15px to 8px
-                  # API Key input with validate button
+      ##Main Page ----
+      tabItem("Start",
+              
+              
+              
+              # UI component
+              box(
+                width = 12,
+                title = "Welcome to AI-Assisted Data Extraction (AIDE)",
                 div(
-                  style = "display: flex; gap: 10px;",
-                  textInput("apiKey", "API Key", 
-                            value = tryCatch({
-                              config <- yaml::read_yaml(file = "config.yml")
-                              config$api$gemini$api_key
-                            }, error = function(e) {
-                              cat("Error accessing config:", e$message, "\n")
-                              ""
-                            }),
-                            width = "400px"),
-                  tags$div(
-                    style = "margin-top: 25px;",  # Adjust this value to align perfectly
-                    actionButton("validateKey", 
-                                 label = "Validate Key",
-                                 icon = icon("check"),
-                                 class = "validate-btn")
-                  )
+                  style = "display: flex; flex-direction: column; gap: 8px;", # Reduced from 15px to 8px
+                  p("AIDE was developed to greatly accelerate the data extraction process for systematic review and meta-analysis. It relies on you having a Google Gemini API key (which are free). It is brought to you by Noah Schroeder, Ph.D. of", HTML('<a href="https://www.learnmeta-analysis.com/" target="_blank" style="display: inline;">Learn Meta-Analysis LLC.</a>')),
+                  h4("How to Use This App"),
+                  p("1) Set up your API settings below. You can obtain a google API key here:", 
+                    HTML('<a href="https://aistudio.google.com/" target="_blank" style="display: inline;">Google AI Studio.</a>')),
+                  p("2) Set up your coding form. Importantly, your first row will be read as prompts by the large language model. The accuracy of the LLM's responses will be influenced very strongly by your prompts. Better prompts = better results."),
+                  p("3) Upload your coding form. Your coding form should be in Excel format for best results."),
+                  p("4) Move to the analyze page and upload the PDF file you want to analyze."),
+                  p("5) Click Analyze button. Your results will autofill under the appropriate prompt."),
+                  p("6) Review each response. You can view the source information by clicking the Source button. You can record each result by clicking the record button. This will save it to your coding form on your local machine."),
+                  p("7) When ready to work on the next PDF, simply upload a new one and the coding form will reset."),
                 ),
-                # Model selection
-                selectInput("modelSelect", "Model",
-                            choices = c("gemini-1.5-flash", "gemini-1.5-pro"),
-                            selected = tryCatch({
-                              fresh_config <- yaml::read_yaml(file = "config.yml")
-                              fresh_config$api$gemini$model
-                            }, error = function(e) {
-                              "gemini-1.5-pro"
-                            }),
-                            width = "400px"),
-                # Rate limits
-                div(
-                  style = "margin-top: -5px;", # Negative margin to reduce space
-                  h4(style = "margin: 0 0 2px 0;", "Rate Limits"), # Reduced margins
-                  p(style = "margin: 0 0 5px 0", # Reduced margins and slightly smaller text
-                    "**Important Notes**"),
-                  p(style = "margin: 0 0 5px 0", "1. Each prompt is its own API call. So if you are coding 40 variables per study, that is 40 API calls per PDF. For this reason Gemini 1.5 Flash is recommended as you will likely hit rate limits quickly on Gemini 1.5 Pro as of the current (December 2024) rate limits.",),
-                    p(style = "margin: 0 0 5px 0", "2. The default rate limits are the maximum of the free tier as of December 2024. You can check current rate limits for the free tier here:", HTML('<a href="https://ai.google.dev/pricing" target="_blank" style="display: inline;">Google AI API Pricing.</a>')),
-                ),
-                div(
-                  style = "display: flex; gap: 10px; margin-top: -5px;", # Added negative top margin
-                  numericInput("requestsPerMinute", "Requests per Minute",
-                               value = tryCatch({
-                                 fresh_config <- yaml::read_yaml(file = "config.yml")
-                                 fresh_config$api$gemini$requests_per_minute
-                               }, error = function(e) {
-                                 if(input$modelSelect == "gemini-1.5-flash") 15 else 2
-                               }),
-                               min = 1,
-                               width = "190px"),
-                  numericInput("requestsPerDay", "Requests per Day",
-                               value = tryCatch({
-                                 fresh_config <- yaml::read_yaml(file = "config.yml")
-                                 fresh_config$api$gemini$requests_per_day
-                               }, error = function(e) {
-                                 if(input$modelSelect == "gemini-1.5-flash") 1500 else 50
-                               }),
-                               min = 1,
-                               width = "190px")
-                ),
-                # Save button
-                div(
-                  style = "display: flex; justify-content: flex-start;",
-                  actionButton("saveSettings", "Save Settings", 
-                               icon = icon("save"),
-                               style = "color: #fff; background-color: #337ab7; border-color: #2e6da4")
-            )
               ),
-            ),
-            ),
-            #Mistral selection ----
-            conditionalPanel(    
-              condition = "input.llmMethod == 'Mistral API'",    
-              box(    
-                width = 6,    
-                title = "Mistral API Settings",    
-                div(    
-                  style = "display: flex; flex-direction: column; gap: 8px;",    
-                  # API Key input with validate button
+              
+              # New LLM Method Selection Box  
+              box(  
+                width = 12,  
+                title = "LLM Method",  
+                div(  
+                  style = "display: flex; flex-direction: column; gap: 8px;",  
+                  p("Choose the way you would like to interact with LLMs"),
+                  selectInput("llmMethod", "",  
+                              choices = c("Google Gemini API", "Mistral API"),  
+                              selected = "Google Gemini API",  
+                              width = "100%"),  
+                )
+              ),  
+              
+              # Conditional UI boxes based on LLM Method selection  
+              #Gemini selection ----
+              conditionalPanel(  
+                condition = "input.llmMethod == 'Google Gemini API'",  
+                #Gemini API settings
+                box(
+                  width = 6,
+                  title = "Gemini API Settings",
                   div(
-                    style = "display: flex; gap: 10px;",
-                    textInput("apiKeyMistral", "API Key", 
-                              value = tryCatch({
-                                config <- yaml::read_yaml(file = "config.yml")
-                                config$api$mistral$api_key
-                              }, error = function(e) {
-                                cat("Error accessing config:", e$message, "\n")
-                                ""
-                              }),
-                              width = "400px"),
-                    tags$div(
-                      style = "margin-top: 25px;",  # Adjust this value to align perfectly
-                      actionButton("validateKeyMistral", 
-                                   label = "Validate Key",
-                                   icon = icon("check"),
-                                   class = "validate-btn")
+                    style = "display: flex; flex-direction: column; gap: 8px;", # Reduced from 15px to 8px
+                    # API Key input with validate button
+                    div(
+                      style = "display: flex; gap: 10px;",
+                      textInput("apiKey", "API Key", 
+                                value = tryCatch({
+                                  config <- yaml::read_yaml(file = "config.yml")
+                                  config$api$gemini$api_key
+                                }, error = function(e) {
+                                  cat("Error accessing config:", e$message, "\n")
+                                  ""
+                                }),
+                                width = "400px"),
+                      tags$div(
+                        style = "margin-top: 25px;",  # Adjust this value to align perfectly
+                        actionButton("validateKey", 
+                                     label = "Validate Key",
+                                     icon = icon("check"),
+                                     class = "validate-btn")
+                      )
+                    ),
+                    # Model selection
+                    selectInput("modelSelect", "Model",
+                                choices = c("gemini-1.5-flash", "gemini-1.5-pro"),
+                                selected = tryCatch({
+                                  fresh_config <- yaml::read_yaml(file = "config.yml")
+                                  fresh_config$api$gemini$model
+                                }, error = function(e) {
+                                  "gemini-1.5-pro"
+                                }),
+                                width = "400px"),
+                    div(
+                      style = "margin-top: -5px;", # Negative margin to reduce space
+                      h4(style = "margin: 0 0 2px 0;", "Payload Description"), # Reduced margins
+                      p(style = "margin: 0 0 5px 0", # Reduced margins and slightly smaller text
+                        "**Important Notes**"),
+                      p(style = "margin: 0 0 5px 0", "Not all LLMs are have vision capabilities to read PDFs. Some require text-only inputs. Use the box below to select if you want to send the PDF or the extracted text from the PDF.",),
+                      p(style = "margin: 0 0 5px 0", "Generally speaking, Gemini Flash and Gemini Pro models (as of December 2024) allow you to send the full PDF."),
+                    ),
+                    #send text or PDF
+                    selectInput("payloadSelect", "Send PDF file or text?",
+                                choices = c("PDF file", "Extracted text"),
+                                selected = "PDF file",
+                                width = "400px"),
+                    # Rate limits
+                    div(
+                      style = "margin-top: -5px;", # Negative margin to reduce space
+                      h4(style = "margin: 0 0 2px 0;", "Rate Limits"), # Reduced margins
+                      p(style = "margin: 0 0 5px 0", # Reduced margins and slightly smaller text
+                        "**Important Notes**"),
+                      p(style = "margin: 0 0 5px 0", "1. Each prompt is its own API call. So if you are coding 40 variables per study, that is 40 API calls per PDF. For this reason Gemini 1.5 Flash is recommended as you will likely hit rate limits quickly on Gemini 1.5 Pro as of the current (December 2024) rate limits.",),
+                      p(style = "margin: 0 0 5px 0", "2. The default rate limits are the maximum of the free tier as of December 2024. You can check current rate limits for the free tier here:", HTML('<a href="https://ai.google.dev/pricing" target="_blank" style="display: inline;">Google AI API Pricing.</a>')),
+                    ),
+                    div(
+                      style = "display: flex; gap: 10px; margin-top: -5px;", # Added negative top margin
+                      numericInput("requestsPerMinute", "Requests per Minute",
+                                   value = tryCatch({
+                                     fresh_config <- yaml::read_yaml(file = "config.yml")
+                                     fresh_config$api$gemini$requests_per_minute
+                                   }, error = function(e) {
+                                     if(input$modelSelect == "gemini-1.5-flash") 15 else 2
+                                   }),
+                                   min = 1,
+                                   width = "190px"),
+                      numericInput("requestsPerDay", "Requests per Day",
+                                   value = tryCatch({
+                                     fresh_config <- yaml::read_yaml(file = "config.yml")
+                                     fresh_config$api$gemini$requests_per_day
+                                   }, error = function(e) {
+                                     if(input$modelSelect == "gemini-1.5-flash") 1500 else 50
+                                   }),
+                                   min = 1,
+                                   width = "190px")
+                    ),
+                    # Save button
+                    div(
+                      style = "display: flex; justify-content: flex-start;",
+                      actionButton("saveSettings", "Save Settings", 
+                                   icon = icon("save"),
+                                   style = "color: #fff; background-color: #337ab7; border-color: #2e6da4")
                     )
                   ),
-                  # Model selection
-                  selectInput("modelSelectMistral", "Model",
-                              choices = c("pixtral-large-latest", "mistral-large-latest"),
-                              selected = tryCatch({
-                                fresh_config <- yaml::read_yaml(file = "config.yml")
-                                fresh_config$api$gemini$model
-                              }, error = function(e) {
-                                "pixtral-large-latest"
-                              }),
-                              width = "400px"),
-                  
-                  
-                  # Save Settings Button    
-                  uiOutput("containerStatus"),  
-                  
-                  actionButton("saveMistralSettings", "Save Settings",     
-                               icon = icon("save"),    
-                               style = "color: #fff; background-color: #337ab7; border-color: #2e6da4")    
+                ),
+              ),
+              #Mistral selection ----
+              conditionalPanel(    
+                condition = "input.llmMethod == 'Mistral API'",    
+                box(    
+                  width = 6,    
+                  title = "Mistral API Settings",    
+                  div(    
+                    style = "display: flex; flex-direction: column; gap: 8px;",    
+                    # API Key input with validate button
+                    div(
+                      style = "display: flex; gap: 10px;",
+                      textInput("apiKeyMistral", "API Key", 
+                                value = tryCatch({
+                                  config <- yaml::read_yaml(file = "config.yml")
+                                  config$api$mistral$api_key
+                                }, error = function(e) {
+                                  cat("Error accessing config:", e$message, "\n")
+                                  ""
+                                }),
+                                width = "400px"),
+                      tags$div(
+                        style = "margin-top: 25px;",  # Adjust this value to align perfectly
+                        actionButton("validateKeyMistral", 
+                                     label = "Validate Key",
+                                     icon = icon("check"),
+                                     class = "validate-btn")
+                      )
+                    ),
+                    # Model selection
+                    selectInput("modelSelectMistral", "Model",
+                                choices = c("mistral-large-latest", "pixtral-large-latest"),
+                                selected = tryCatch({
+                                  fresh_config <- yaml::read_yaml(file = "config.yml")
+                                  fresh_config$api$mistral$model
+                                }, error = function(e) {
+                                  "mistral-large-latest"
+                                }),
+                                width = "400px"),
+                    
+                    div(
+                      style = "margin-top: -5px;", # Negative margin to reduce space
+                      h4(style = "margin: 0 0 2px 0;", "Payload Description"), # Reduced margins
+                      p(style = "margin: 0 0 5px 0", # Reduced margins and slightly smaller text
+                        "**Important Notes**"),
+                      p(style = "margin: 0 0 5px 0", "1) In our testing, Mistral models do not always reply in the required format precisely, meaning that the 'source' button on the analyze page may not always work. Otherwise the models have performed well.",),
+                      p(style = "margin: 0 0 5px 0", "As of December 2024, Mistral models cannot process PDF files directly via API, so this app extracts the text from the PDF and sends the text to Mistral."),
+                    ),
+                    # Save Settings Button    
+                    uiOutput("containerStatus"),  
+                    
+                    actionButton("saveSettingsMistral", "Save Settings",     
+                                 icon = icon("save"),    
+                                 style = "color: #fff; background-color: #337ab7; border-color: #2e6da4")    
+                  )    
                 )    
-              )    
-            ),   
-            
-    
-            # Upload Coding Form Button
-            box(
-              width = 6,
-              title = "Coding Form",
-              p("Upload your coding form here. Please note that the LLM with use the first row in your form as the prompts, so make sure they are written as LLM prompts!"),
-              div(
-              style = "display: flex; gap: 10px; width: 100%;",
-              fileInput("codingFormFile", "Upload Coding Form (Excel preferred)", 
-                        accept = c(".csv", ".xls", ".xlsx"),
-                        width = "100%")
-            ),
-            ),
-    ),
-
-      ## Analysis ----
-    tabItem("Analyze",
-      fluidRow(
-      # PDF Preview on the left
-      column(width = 6,
-             box(
-               width = NULL,
-               title = "Upload PDF",
-               status = "primary",
-               solidHeader = TRUE,
-               fileInput("pdfFile", "Choose PDF File",
-                         accept = c("application/pdf")),
-               div(
-                 actionButton("analyzeBtn", "Analyze PDF",
-                              class = "btn-primary btn-primary-disabled",  # Start with disabled style
-                              disabled = TRUE),  # Start disabled
-               ),
-               # Add styles to ensure no extra scrollbars
-               div(class = "pdf-container",
-                   uiOutput("pdfImage"),
-                   div(
-                     uiOutput("fileStatus")
-                   )
-               )
-             )
+              ),   
+              
+              
+              # Upload Coding Form Button
+              box(
+                width = 6,
+                title = "Coding Form",
+                p("Upload your coding form here. Please note that the LLM with use the first row in your form as the prompts, so make sure they are written as LLM prompts!"),
+                div(
+                  style = "display: flex; gap: 10px; width: 100%;",
+                  fileInput("codingFormFile", "Upload Coding Form (Excel preferred)", 
+                            accept = c(".csv", ".xls", ".xlsx"),
+                            width = "100%")
+                ),
+              ),
       ),
       
-      # Chat interface on the right
-      column(
-        width = 6,
-        fluidRow(
-          box(
-            width = 12,
-            title = "Coding Form",
-            status = "success",
-            solidHeader = TRUE,
-            div(
-              style = "height: 86.5vh; overflow-y: auto; padding-right: 10px;",
-            
-            # Generate coding prompts dynamically
-            uiOutput("codingPrompts"))
-          )
-        )
+      ## Analysis ----
+      tabItem("Analyze",
+              fluidRow(
+                # PDF Preview on the left
+                column(width = 6,
+                       box(
+                         width = NULL,
+                         title = "Upload PDF",
+                         status = "primary",
+                         solidHeader = TRUE,
+                         fileInput("pdfFile", "Choose PDF File",
+                                   accept = c("application/pdf")),
+                         div(
+                           actionButton("analyzeBtn", "Analyze PDF",
+                                        class = "btn-primary btn-primary-disabled",  # Start with disabled style
+                                        disabled = TRUE),  # Start disabled
+                         ),
+                         # Add styles to ensure no extra scrollbars
+                         div(class = "pdf-container",
+                             uiOutput("pdfImage"),
+                             div(
+                               uiOutput("fileStatus")
+                             )
+                         )
+                       )
+                ),
+                
+                # Chat interface on the right
+                column(
+                  width = 6,
+                  fluidRow(
+                    box(
+                      width = 12,
+                      title = "Coding Form",
+                      status = "success",
+                      solidHeader = TRUE,
+                      div(
+                        style = "height: 86.5vh; overflow-y: auto; padding-right: 10px;",
+                        
+                        # Generate coding prompts dynamically
+                        uiOutput("codingPrompts"))
+                    )
+                  )
+                )
+              )
       )
     )
   )
-    )
-)
 )
 
 # Server logic ----
@@ -804,7 +825,13 @@ server <- function(input, output, session) {
         "    api_key: \"", current_config$api$gemini$api_key, "\"\n",
         "    rate_limits:\n",
         "      requests_per_minute: ", current_config$api$gemini$rate_limits$requests_per_minute, "\n", 
-        "      requests_per_day: ", current_config$api$gemini$rate_limits$requests_per_day,
+        "      requests_per_day: ", current_config$api$gemini$rate_limits$requests_per_day, "\n",
+        "  mistral:\n",
+        "    base_url: \"", "https://api.mistral.ai/v1", "\"\n",
+        "    model: \"", current_config$api$mistral$model, "\"\n",
+        "    api_key: \"", current_config$api$mistral$api_key, "\"\n",
+        "    rate_limits:\n",
+        "      requests_per_minute: ", current_config$api$mistral$rate_limits$requests_per_minute, "\n", 
         "\n\n"
       ),
       "config.yml"
@@ -1026,7 +1053,7 @@ server <- function(input, output, session) {
       showNotification("No prompts found. Please upload a valid coding form.", type = "warning")
       return()
     }
-
+    
     # Create and show a modal dialog with progress
     showModal(modalDialog(
       title = NULL,
@@ -1245,7 +1272,7 @@ server <- function(input, output, session) {
     }
   })
   
- 
+  
   
   # Record Buttons
   observe({
@@ -1641,7 +1668,7 @@ server <- function(input, output, session) {
       )
     })
   })
-
+  
   ##Mistral Analysis----
   analyze_with_mistral <- function(pdf_text, prompts, config, progress_callback = NULL) {
     # Existing validation checks
@@ -1852,10 +1879,43 @@ server <- function(input, output, session) {
     
     return(responses)
   }
+  
+  ### Gemini Save settings ----
+  observeEvent(input$saveSettingsMistral, {
+    # Read the existing config while preserving comments and structure
+    current_config <- yaml::read_yaml("config.yml")
+    
+    # Only update the specific values we want to change
+    current_config$api$mistral$api_key <- input$apiKeyMistral
+    current_config$api$mistral$model <- input$modelSelectMistral  
 
-
+    ### Mistral write config.yml ----
+    writeLines(
+      paste0(
+        "api:\n",
+        "  gemini:\n",
+        "    base_url: \"", "https://generativelanguage.googleapis.com/v1beta", "\"\n",
+        "    model: \"", current_config$api$gemini$model, "\"\n",
+        "    api_key: \"", current_config$api$gemini$api_key, "\"\n",
+        "    rate_limits:\n",
+        "      requests_per_minute: ", current_config$api$gemini$rate_limits$requests_per_minute, "\n", 
+        "      requests_per_day: ", current_config$api$gemini$rate_limits$requests_per_day, "\n",
+        "  mistral:\n",
+        "    base_url: \"", "https://api.mistral.ai/v1", "\"\n",
+        "    model: \"", current_config$api$mistral$model, "\"\n",
+        "    api_key: \"", current_config$api$mistral$api_key, "\"\n",
+        "    rate_limits:\n",
+        "      requests_per_minute: ", current_config$api$mistral$rate_limits$requests_per_minute, "\n", 
+        "\n\n"
+      ),
+      "config.yml"
+    )
+    
+    showNotification("API Settings saved successfully", type = "message")
+  })
   
   
 }
+
 # Run the Shiny app
 shinyApp(ui = ui, server = server)

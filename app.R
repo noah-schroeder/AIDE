@@ -283,20 +283,7 @@ ui <- dashboardPage(
                                   "gemini-1.5-pro"
                                 }),
                                 width = "400px"),
-                    div(
-                      style = "margin-top: -5px;", # Negative margin to reduce space
-                      h4(style = "margin: 0 0 2px 0;", "Payload Description"), # Reduced margins
-                      p(style = "margin: 0 0 5px 0", # Reduced margins and slightly smaller text
-                        "**Important Notes**"),
-                      p(style = "margin: 0 0 5px 0", "Not all LLMs are have vision capabilities to read PDFs. Some require text-only inputs. Use the box below to select if you want to send the PDF or the extracted text from the PDF.",),
-                      p(style = "margin: 0 0 5px 0", "Generally speaking, Gemini Flash and Gemini Pro models (as of December 2024) allow you to send the full PDF."),
-                    ),
-                    #send text or PDF
-                    selectInput("payloadSelect", "Send PDF file or text?",
-                                choices = c("PDF file", "Extracted text"),
-                                selected = "PDF file",
-                                width = "400px"),
-                    # Rate limits
+                   # Rate limits
                     div(
                       style = "margin-top: -5px;", # Negative margin to reduce space
                       h4(style = "margin: 0 0 2px 0;", "Rate Limits"), # Reduced margins

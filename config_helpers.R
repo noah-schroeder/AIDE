@@ -17,7 +17,13 @@ write_config <- function(current_config, file_path = "config.yml") {
       "    model: \"", current_config$api$mistral$model, "\"\n",  
       "    api_key: \"", current_config$api$mistral$api_key, "\"\n",  
       "    rate_limits:\n",  
-      "      requests_per_minute: ", current_config$api$mistral$rate_limits$requests_per_minute, "\n",  
+      "      requests_per_minute: ", current_config$api$mistral$rate_limits$requests_per_minute, "\n",
+      "  openrouter:\n",  
+      "    base_url: \"", "https://openrouter.ai/api/v1", "\"\n",  
+      "    model: \"", current_config$api$openrouter$model, "\"\n",  
+      "    api_key: \"", current_config$api$openrouter$api_key, "\"\n",  
+      "    rate_limits:\n",  
+      "      requests_per_minute: ", current_config$api$openrouter$rate_limits$requests_per_minute, "\n",
       "\n" # Single newline at the end  
     )  
     writeLines(new_content, file_path)  
@@ -40,6 +46,12 @@ write_config <- function(current_config, file_path = "config.yml") {
     "    api_key: \"", current_config$api$mistral$api_key, "\"\n",  
     "    rate_limits:\n",  
     "      requests_per_minute: ", current_config$api$mistral$rate_limits$requests_per_minute, "\n",  
+    "  openrouter:\n",  
+    "    base_url: \"", "https://openrouter.ai/api/v1", "\"\n",  
+    "    model: \"", current_config$api$openrouter$model, "\"\n",  
+    "    api_key: \"", current_config$api$openrouter$api_key, "\"\n",  
+    "    rate_limits:\n",  
+    "      requests_per_minute: ", current_config$api$openrouter$rate_limits$requests_per_minute, "\n",
     "\n" # Single newline at the end  
   )  
   

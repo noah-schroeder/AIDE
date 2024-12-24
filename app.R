@@ -40,6 +40,7 @@ ui <- dashboardPage(
   dashboardSidebar(
     sidebarMenu(
       menuItem("Start Here", tabName = "Start"),
+      menuItem("Setup", tabName = "LLM"),
       menuItem("Analyze", tabName = "Analyze"),
       menuItem("Cite", tabName = "Cite")
     )
@@ -199,7 +200,18 @@ ui <- dashboardPage(
       margin-bottom: 5px;  
       font-family: monospace;  
     }  
+    .content-wrapper {  
+      background-color: #f8f9fa !important; /* Lighter background color */  
+      padding: 15px; /* Optional: Add padding for better spacing */  
+    }  
 
+    body {  
+      background-color: #f8f9fa !important;  
+    }  
+    
+    .wrapper {  
+      background-color: #f8f9fa !important;  
+    }
      "))
     ),
     
@@ -218,19 +230,69 @@ ui <- dashboardPage(
                 title = "Welcome to AI-Assisted Data Extraction (AIDE)",
                 div(
                   style = "display: flex; flex-direction: column; gap: 8px;", # Reduced from 15px to 8px
-                  p("AIDE was developed to greatly accelerate the data extraction process for systematic review and meta-analysis. It relies on you having a Google Gemini API key (which are free). It is brought to you by Noah Schroeder, Ph.D. of", HTML('<a href="https://www.learnmeta-analysis.com/" target="_blank" style="display: inline;">Learn Meta-Analysis LLC.</a>')),
-                  h4("How to Use This App"),
-                  p("1) Set up your API settings below. You can obtain a google API key here:", 
-                    HTML('<a href="https://aistudio.google.com/" target="_blank" style="display: inline;">Google AI Studio.</a>')),
+                  p("AIDE was developed to greatly accelerate the data extraction process for systematic review and meta-analysis. It relies on you having an API key for Google Gemini, Mistral, or Open Router (which all offer free tiers as of December 2024).",
+                  ),
+                ),
+              ),
+              box(
+                width = 6,
+                title = "How to Use This App",
+                div(
+                  style = "display: flex; flex-direction: column; gap: 8px;", # Reduc
+                  p("1) You will need an API key for the LLM provider of your choice (Google Gemini, Mistral, or Open Router). At the time this app was created (December, 2024), all three of the following providers offered free API tiers:", 
+                    HTML("API Key Providers:  
+                      <ul>  
+                        <li><a href='https://aistudio.google.com/' target='_blank' style='display: inline;'>Google AI Studio</a></li>  
+                        <li><a href='https://mistral.ai/' target='_blank' style='display: inline;'>Mistral AI</a></li>  
+                        <li><a href='https://openrouter.ai/' target='_blank' style='display: inline;'>Open Router</a></li>  
+                      </ul>")
+                    ),
                   p("2) Set up your coding form. Importantly, your first row will be read as prompts by the large language model. The accuracy of the LLM's responses will be influenced very strongly by your prompts. Better prompts = better results."),
-                  p("3) Upload your coding form. Your coding form should be in Excel format for best results."),
+                  p("3) Move to the LLM Setup tab of this app where you can continue with the following steps:"),
+                  p("4) Upload your coding form. Your coding form should be in Excel format for best results."),
                   p("4) Move to the analyze page and upload the PDF file you want to analyze."),
                   p("5) Click Analyze button. Your results will autofill under the appropriate prompt."),
                   p("6) Review each response. You can view the source information by clicking the Source button. You can record each result by clicking the record button. This will save it to your coding form on your local machine."),
                   p("7) When ready to work on the next PDF, simply upload a new one and the coding form will reset."),
                 ),
               ),
-              
+              box(
+                width = 6,
+                title = "Common Questions",
+                div(
+                  style = "display: flex; flex-direction: column; gap: 8px;", # Reduc
+                  strong("What LLM should I use?"),
+                  p("We have had excellent results with Google Gemini models. Mistral large also performs very well in our testing, however it has not always responded in a way where we can always parse the source. Open Router tends to offer smaller models, and they have not performed as well in our informal testing. For this reason, we suggest using either Gemini or Mistral models as of December 2024."),
+                  strong("What source text is sent to the LLM?"),
+                  p("This app uses the pdftools package for R to extract structured text from the PDF. This means images are not sent to the LLM, and some formatting in the PDF may be lost. This is a necessary trade off because at this point (December 2024) you cannot send PDF files directly to many LLMs, many require text data."),
+                  strong("What system and user prompts do you use?"),
+                  HTML("Prompts used:  
+                      <ul>  
+                        <li>Google Gemini</li> 
+                        <ul>
+                          <li>System prompt: None</li>
+                          <li>User prompt: Analyze this PDF and answer ALL of the following prompts. For EACH prompt, you MUST provide... [continues into answer, source, page labels]</li>
+                        </ul>
+                        <li>Mistral</li> 
+                        <ul>
+                          <li>System prompt: You are an expert PDF analyzer. You will process multiple prompts about this document.</li>
+                          <li>User prompt: Analyze this PDF text and answer ALL of the following prompts... [continues into answer, source, page labels]  </li>
+                        </ul>
+                        <li>Open Router</li> 
+                        <ul>
+                          <li>System prompt: You are an expert PDF analyzer. You will process multiple prompts about this document.</li>
+                          <li>User prompt: Analyze this PDF text and answer ALL of the following prompts... [continues into answer, source, page labels]  </li>
+                        </ul>
+                      </ul>"),
+                  strong("Is each prompt an API call? How do I know how many times I'm sending a request to the API?"),
+                  p("Each time you press \"Analyze\" on the analysis page it makes one API request. All prompts and the full text are built into one API request. "),
+                  strong("Can I see the direct responses from the API?"),
+                  p("A lot of information prints in the R console for debugging purposes."),
+                  ),
+              ),
+      ),
+      #LLM Config ----
+         tabItem("LLM",     
               # New LLM Method Selection Box  
               box(  
                 width = 12,  
@@ -247,6 +309,19 @@ ui <- dashboardPage(
               
               # Conditional UI boxes based on LLM Method selection  
               #Gemini selection ----
+              conditionalPanel(    
+                condition = "input.llmMethod == 'Google Gemini API'",    
+                box(    
+                  width = 12,    
+                  title = "Google Gemini API Notes",    
+                  div(    
+                    style = "display: flex; flex-direction: column; gap: 8px;",    
+                    p("1) The free tier of the Google Gemini API has rate limits. You can check current rate limits for the free tier here:", HTML('<a href="https://ai.google.dev/pricing" target="_blank" style="display: inline;">Google AI API Pricing.</a>'), "This app enforces a rate limit of 2 requests per minute, which is very conservative."),
+                    p("2) There are a variety of different models available from Google, such as various versions of Gemini Flash and Gemini Pro. You can find the list of all models here:", HTML('<a href="https://ai.google.dev/gemini-api/docs/models/gemini" target="_blank" style="display: inline;">Google AI Models.</a>'), "Our experience during testing was that Gemini 1.5 Pro slightly outperformed Gemini 1.5 Flash, however 1.5 Flash was still very good!"),    
+                    )
+                )
+              ),
+              
               conditionalPanel(  
                 condition = "input.llmMethod == 'Google Gemini API'",  
                 #Gemini API settings
@@ -289,11 +364,8 @@ ui <- dashboardPage(
                     div(
                       style = "margin-top: -5px;", # Negative margin to reduce space
                       h4(style = "margin: 0 0 2px 0;", "Rate Limits"), # Reduced margins
-                      p(style = "margin: 0 0 5px 0", # Reduced margins and slightly smaller text
-                        "**Important Notes**"),
-                      p(style = "margin: 0 0 5px 0", "1. Each prompt is its own API call. So if you are coding 40 variables per study, that is 40 API calls per PDF. For this reason Gemini 1.5 Flash is recommended as you will likely hit rate limits quickly on Gemini 1.5 Pro as of the current (December 2024) rate limits.",),
-                      p(style = "margin: 0 0 5px 0", "2. The default rate limits are the maximum of the free tier as of December 2024. You can check current rate limits for the free tier here:", HTML('<a href="https://ai.google.dev/pricing" target="_blank" style="display: inline;">Google AI API Pricing.</a>')),
-                    ),
+                      p("Always check to ensure you don't exceed free tier rate limit usage:", HTML('<a href="https://ai.google.dev/pricing" target="_blank" style="display: inline;">Google AI API Pricing.</a>')),
+                      ),
                     div(
                       style = "display: flex; gap: 10px; margin-top: -5px;", # Added negative top margin
                       numericInput("requestsPerMinute", "Requests per Minute",
@@ -301,7 +373,7 @@ ui <- dashboardPage(
                                      fresh_config <- yaml::read_yaml(file = "config.yml")
                                      fresh_config$api$gemini$requests_per_minute
                                    }, error = function(e) {
-                                     if(input$modelSelect == "gemini-1.5-flash") 15 else 2
+                                     if(input$modelSelect == "gemini-1.5-flash") 2 else 2
                                    }),
                                    min = 1,
                                    width = "190px"),
@@ -316,16 +388,29 @@ ui <- dashboardPage(
                                    width = "190px")
                     ),
                     # Save button
-                    div(
-                      style = "display: flex; justify-content: flex-start;",
+                 
+                      p("You must click save settings before you can use this model."),
                       actionButton("saveSettings", "Save Settings", 
                                    icon = icon("save"),
                                    style = "color: #fff; background-color: #337ab7; border-color: #2e6da4")
-                    )
+                    
                   ),
                 ),
               ),
               #Mistral selection ----
+              conditionalPanel(    
+                condition = "input.llmMethod == 'Mistral API'",    
+                box(    
+                  width = 12,    
+                  title = "Mistral API Notes",    
+                  div(    
+                    style = "display: flex; flex-direction: column; gap: 8px;",    
+                    p("1) Mistral has a very generous experimental/research API at the time this app was created (December, 2024). The full list of models is here:", HTML('<a href="https://docs.mistral.ai/getting-started/models/models_overview/" target="_blank" style="display: inline;">Mistral Models.</a>'), "We have only included models that have a 128K or larger context window."),
+                    p("2) Since we are sending text data only, and at least as of December 2024 Mistral allowed those with free API key usage to use all models, we recommend using Mistral Large as we have had very good results with it."),    
+                    p("3) In our testing, Mistral models do not always reply in the required format precisely such that our parsing can pick it up correctly. Consequently, that the 'source' button on the analyze page may not always work. Otherwise the models have performed well."),    
+                    )
+                )
+              ),
               conditionalPanel(    
                 condition = "input.llmMethod == 'Mistral API'",    
                 box(    
@@ -355,7 +440,7 @@ ui <- dashboardPage(
                     ),
                     # Model selection
                     selectInput("modelSelectMistral", "Model",
-                                choices = c("mistral-large-latest", "pixtral-large-latest"),
+                                choices = c("mistral-large-latest", "pixtral-large-latest", "pixtral-12b-2409", "ministral-3b-latest", "ministral-8b-latest"),
                                 selected = tryCatch({
                                   fresh_config <- yaml::read_yaml(file = "config.yml")
                                   fresh_config$api$mistral$model
@@ -363,18 +448,10 @@ ui <- dashboardPage(
                                   "mistral-large-latest"
                                 }),
                                 width = "400px"),
-                    
-                    div(
-                      style = "margin-top: -5px;", # Negative margin to reduce space
-                      h4(style = "margin: 0 0 2px 0;", "Payload Description"), # Reduced margins
-                      p(style = "margin: 0 0 5px 0", # Reduced margins and slightly smaller text
-                        "**Important Notes**"),
-                      p(style = "margin: 0 0 5px 0", "1) In our testing, Mistral models do not always reply in the required format precisely, meaning that the 'source' button on the analyze page may not always work. Otherwise the models have performed well.",),
-                      p(style = "margin: 0 0 5px 0", "As of December 2024, Mistral models cannot process PDF files directly via API, so this app extracts the text from the PDF and sends the text to Mistral."),
-                    ),
+          
                     # Save Settings Button    
                     uiOutput("containerStatus"),  
-                    
+                    p("You must click save settings before you can use this model."),
                     actionButton("saveSettingsMistral", "Save Settings",     
                                  icon = icon("save"),    
                                  style = "color: #fff; background-color: #337ab7; border-color: #2e6da4")    
@@ -382,7 +459,97 @@ ui <- dashboardPage(
                 )    
               ),   
               
+              # Open Router Selection ----
+              conditionalPanel(    
+                condition = "input.llmMethod == 'OpenRouter API'",    
+                box(    
+                  width = 12,    
+                  title = "Open Router API Notes",    
+                  div(    
+                    style = "display: flex; flex-direction: column; gap: 8px;",    
+                    p("1) Not all Open Router Models are free to use. You can check which models are currently free here (make sure pricing is set to 0 and the model name should end with (free):", 
+                      HTML('<a href="https://openrouter.ai/models?max_price=0" target="_blank" style="display: inline;">Open Router Model Pricing.</a>')),
+                    p("2) Open Router Models has limits on how much you can use free models per minute and per day:", 
+                      HTML('<a href="https://openrouter.ai/docs/limits" target="_blank" style="display: inline;">Open Router Limits.</a>')),
+                    p("3) You must copy-paste in the Open Router model name in the box below. We do not have a dropdown menu because they may change what models are available."),
+                    p("3) Note that different models are made for different things and not all will perform well for data extraction. In fact, of the freely available models from Open Router that we tested during development (December, 2024), none worked as well as the models available through the Gemini or Mistral APIs."),
+                    p("4) We have not tested any paid models. Use paid models at your own risk, there is no guarentee they will be compatible with this app."),
+                    p("5) Open Router provides access to a large number of models by a number of different companies. Not all conform to the same API standards. Therefore, there is no guarantee that this app can utilize and parse the responses from any specific LLM. At the time of development (December, 2024), we tested the following models:"),
+                    HTML("Generally Working Models (not guaranteed)  
+                        <ul>  
+                          <li>Mythomax-l2-13b</li>  
+                          <li>Microsoft Phi 3 Mini 128k Instruct</li>
+                          <li>Mistral 7B Instruct (we recommend using Mistral API instead though, which uses larger models and produces better results in our testing.)</li>
+                        </ul>  
+                      "),
+                    HTML("Partially Working Models (source button likely won't work properly)  
+                        <ul>  
+                          <li>Most Meta Llama 3, 3.1, or 3.2 model</li>  
+                          <li>Microsoft Phi 3 Medium 128k Instruct</li>
+                          <li>Open Chat 7B</li>
+                          <li>Toppy M 7b</li>
+                          <li>Qwen 2 6b Instruct</li>
+                          <li>Zephyr 7b Beta</li>
+                        </ul>  
+                      "), 
+                    HTML("The following models will not work in this app:  
+                        <ul>  
+                          <li>Any Google Gemini Model (use the Gemini API in the app instead)</li>
+                          <li>Meta Llama 3.2 90b Vision Instruct</li>
+                          <li>Meta Llama 3.1 70b Instruct</li>
+                        </ul>  
+                      ")
+                  )
+                )
+              ),
               
+              conditionalPanel(    
+                condition = "input.llmMethod == 'OpenRouter API'",    
+                box(    
+                  width = 6,    
+                  title = "Open Router API Settings",    
+                  div(    
+                    style = "display: flex; flex-direction: column; gap: 8px;",    
+                    # API Key input with validate button
+                    div(
+                      style = "display: flex; gap: 10px;",
+                      textInput("apiKeyOpenRouter", "API Key", 
+                                value = tryCatch({
+                                  config <- yaml::read_yaml(file = "config.yml")
+                                  config$api$openrouter$api_key
+                                }, error = function(e) {
+                                  cat("Error accessing config:", e$message, "\n")
+                                  ""
+                                }),
+                                width = "400px"),
+                      tags$div(
+                        style = "margin-top: 25px;",  # Adjust this value to align perfectly
+                        actionButton("validateKeyOpenRouter", 
+                                     label = "Validate Key",
+                                     icon = icon("check"),
+                                     class = "validate-btn")
+                      )
+                    ),
+                    # Model selection
+                    textInput("modelSelectOpenRouter", "Model",
+                                value = tryCatch({
+                                  fresh_config <- yaml::read_yaml(file = "config.yml")
+                                  fresh_config$api$openrouter$model
+                                }, error = function(e) {
+                                  "enter model name from Open Router"
+                                }),
+                                width = "400px"),
+                    
+                   
+                    # Save Settings Button    
+                    uiOutput("containerStatus"),  
+                    p("You must click save settings before you can use this model."),
+                    actionButton("saveSettingsOpenRouter", "Save Settings",     
+                                 icon = icon("save"),    
+                                 style = "color: #fff; background-color: #337ab7; border-color: #2e6da4")    
+                  )    
+                )    
+              ),   
               
               # Upload Coding Form Button
               box(
@@ -470,7 +637,9 @@ server <- function(input, output, session) {
   current_row <- reactiveVal(NULL)
   validationStatus <- reactiveVal("pending") # Can be "pending", "success", or "failed"
   # Reactive value to track Mistral validation status
-  validationStatusMistral <- reactiveVal("initial")
+  validationStatusMistral <- reactiveVal("pending")
+  # Reactive value to track Mistral validation status
+  validationStatusOpenRouter <- reactiveVal("pending")
   # Save Properly
   original_file_path <- reactiveVal(NULL)
   #control analyze button state:
@@ -559,7 +728,7 @@ server <- function(input, output, session) {
     if (is.null(rv$codingForm)) {
       div(
         style = "color: #f00; position: absolute; top: 10px; left: 50%; transform: translateX(-50%);",
-        "Please upload a coding form on the Start Here page before proceeding."
+        "Please upload a coding form on the Setup page before proceeding."
       )
     } else {
       div(
@@ -786,7 +955,7 @@ server <- function(input, output, session) {
   observeEvent(input$modelSelect, {
     # Update rate limits when model changes
     if(input$modelSelect == "gemini-1.5-flash") {
-      updateNumericInput(session, "requestsPerMinute", value = 15)
+      updateNumericInput(session, "requestsPerMinute", value = 2)
       updateNumericInput(session, "requestsPerDay", value = 1500)
     } else {
       updateNumericInput(session, "requestsPerMinute", value = 2)
@@ -811,7 +980,12 @@ server <- function(input, output, session) {
           mistral = list(  
             model = "mistral-large-latest",  
             api_key = "your_mistral_api_key",  
-            rate_limits = list(requests_per_minute = 2)  
+            rate_limits = list(requests_per_minute = 2)
+          ),
+          openrouter = list(  
+            model = "enter your model",  
+            api_key = "your_open_router_api_key",  
+            rate_limits = list(requests_per_minute = 2)
           )  
         )  
       )  
@@ -1053,7 +1227,8 @@ PROMPTS:
     # Choose the appropriate analysis function based on selected LLM  
     analysis_function <- switch(input$llmMethod,  
                                 "Google Gemini API" = analyze_with_gemini,  
-                                "Mistral API" = analyze_with_mistral)
+                                "Mistral API" = analyze_with_mistral,
+                                "OpenRouter API" = analyze_with_openrouter)
     
     # Reset previous results with empty lists
     rv$sources <- list()
@@ -1905,7 +2080,12 @@ If no direct source is found, explain your reasoning.",
           mistral = list(  
             model = "mistral-large-latest",  
             api_key = "your_mistral_api_key",  
-            rate_limits = list(requests_per_minute = 2)  
+            rate_limits = list(requests_per_minute = 2)
+          ),
+          openrouter = list(  
+            model = "enter your model",  
+            api_key = "your_open_router_api_key",  
+            rate_limits = list(requests_per_minute = 2)
           )  
         )  
       )  
@@ -1922,6 +2102,361 @@ If no direct source is found, explain your reasoning.",
   })  
   
   
+### OpenRouter API key validation ----
+  observeEvent(input$validateKeyOpenRouter, {
+    req(input$apiKeyOpenRouter)
+    req(input$modelSelectOpenRouter)
+    
+    # Update button to loading state
+    validationStatusOpenRouter("loading")
+    updateActionButton(session, "validateKeyOpenRouter",
+                       label = "Validating...",
+                       icon = icon("spinner", class = "fa-spin"))
+    
+    # Show loading notification
+    id <- showNotification(
+      "Validating API key...",
+      type = "default",
+      duration = NULL,
+      closeButton = FALSE
+    )
+    
+    # Validate the API key using a simple test request
+    tryCatch({
+      response <- httr::POST(
+        url = "https://openrouter.ai/api/v1/chat/completions",
+        httr::add_headers(
+          "Authorization" = paste("Bearer", input$apiKeyOpenRouter),
+          "Content-Type" = "application/json"
+        ),
+        body = jsonlite::toJSON(list(
+          model = input$modelSelectOpenRouter,
+          messages = list(
+            list(
+              role = "user",
+              content = "Test API connection"
+            )
+          ),
+          max_tokens = 10  # Minimal response to speed up test
+        ), auto_unbox = TRUE),
+        httr::timeout(10)  # 10-second timeout
+      )
+      
+      # Check response
+      if (httr::status_code(response) == 200) {
+        removeNotification(id)
+        validationStatusOpenRouter("success")
+        updateActionButton(session, "validateKeyOpenRouter",
+                           label = "",
+                           icon = icon("check"))
+        
+        # More explicit JS to add success class and style
+        runjs("
+        $('#validateKeyOpenRouter').addClass('validate-btn-success');
+        $('#validateKeyOpenRouter').css({
+          'background-color': '#28a745',
+          'color': 'white',
+          'border-color': '#28a745'
+        });
+      ")
+        
+        showNotification(
+          "API key is valid!",
+          type = "default",
+          duration = 5
+        )
+      } else {
+        removeNotification(id)
+        validationStatusOpenRouter("failed")
+        updateActionButton(session, "validateKeyOpenRouter",
+                           label = "Validate Key",
+                           icon = icon("check"))
+        
+        # Reset button style
+        runjs("
+        $('#validateKeyOpenRouter').removeClass('validate-btn-success');
+        $('#validateKeyOpenRouter').css({
+          'background-color': '',
+          'color': '',
+          'border-color': ''
+        });
+      ")
+        
+        # Try to get more information about the error
+        error_content <- tryCatch(
+          httr::content(response, "text", encoding = "UTF-8"),
+          error = function(e) "Unable to parse error response"
+        )
+        
+        # Print the full response for debugging
+        print("Full Response:")
+        print(response)
+        print("Error Content:")
+        print(error_content)
+        
+        showNotification(
+          paste("Invalid API key. Status:", httr::status_code(response),
+                "Response:", error_content),
+          type = "error",
+          duration = 5
+        )
+      }
+    }, error = function(e) {
+      removeNotification(id)
+      validationStatusOpenRouter("failed")
+      updateActionButton(session, "validateKeyOpenRouter",
+                         label = "Validate Key",
+                         icon = icon("check"))
+      
+      # Reset button style
+      runjs("
+      $('#validateKeyOpenRouter').removeClass('validate-btn-success');
+      $('#validateKeyOpenRouter').css({
+        'background-color': '',
+        'color': '',
+        'border-color': ''
+      });
+    ")
+      
+      # More detailed error handling
+      error_message <- if(inherits(e, "error")) {
+        if(grepl("Could not resolve host", e$message)) {
+          "Network error: Please check your internet connection"
+        } else if(grepl("Operation timed out", e$message)) {
+          "Request timed out. Please check your internet connection and try again."
+        } else {
+          paste("Error validating API key:", e$message, "Class:", class(e))
+        }
+      } else {
+        paste("An unknown error occurred:", e)
+      }
+      
+      # Print the full error object for debugging
+      print("Full Error Object:")
+      print(e)
+      
+      showNotification(
+        error_message,
+        type = "error",
+        duration = 5
+      )
+    })
+  })
+  
+  ##OpenRouter Analysis----
+  analyze_with_openrouter <- function(pdf_text, prompts, config, progress_callback = NULL) {
+    # Basic validation
+    if (is.null(pdf_text) || length(pdf_text) == 0) {
+      stop("PDF text is empty or null")
+    }
+    if (is.null(prompts) || length(prompts) == 0) {
+      stop("Prompts are empty or null")
+    }
+    
+    # Simple configuration extraction
+    base_url <- "https://openrouter.ai/api/v1" # OpenRouter base URL
+    model <- config$api$openrouter$model
+    api_key <- config$api$openrouter$api_key
+    
+    url <- sprintf("%s/chat/completions", base_url)
+    
+    # Ensure full PDF text is captured
+    full_pdf_text <- paste(pdf_text, collapse = "\n")
+    
+    # Debug: Print total PDF text length and first/last characters
+    total_pdf_text_length <- nchar(full_pdf_text)
+    print(paste("Total PDF text length:", total_pdf_text_length, "characters"))
+    
+    # Print out the exact prompts for debugging
+    print("Exact Prompts:")
+    for (i in seq_along(prompts)) {
+      print(paste(i, ":", prompts[i]))
+    }
+    
+    # Construct payload with correct structure
+    payload <- list(
+      model = model,
+      messages = list(
+        # Ensure each message is a list with explicit role and content
+        list(
+          role = "system",
+          content = "You are an expert PDF analyzer. You will process multiple prompts about this document."
+        ),
+        list(
+          role = "user",
+          content = sprintf("Analyze this PDF text and answer ALL of the following prompts:
+
+PDF TEXT:
+%s
+
+PROMPTS:
+%s
+
+For EACH prompt, provide:
+- PROMPT: [original prompt]
+- ANSWER: [comprehensive answer]
+- SOURCE: [exact supporting text from PDF, if applicable]
+- PAGE: [page number where source appears]
+
+If no direct source is found, explain your reasoning.",
+                            full_pdf_text,
+                            paste(prompts, collapse = "\n")
+          )
+        )
+      ),
+      temperature = 0.1,
+      max_tokens = 8192  # Increased token limit
+    )
+    
+    # Comprehensive API call with multiple error handling mechanisms
+    result <- tryCatch({
+      # Use httr2 for more robust request handling
+      req <- httr2::request(url) %>%
+        httr2::req_method("POST") %>%
+        httr2::req_headers(
+          "Content-Type" = "application/json",
+          "Authorization" = paste("Bearer", api_key),
+        ) %>%
+        httr2::req_body_json(payload) %>%
+        httr2::req_timeout(300)  # 5-minute timeout
+      
+      # Perform the request with error tracking
+      resp <- httr2::req_perform(req)
+      
+      # Parse response
+      response_content <- httr2::resp_body_json(resp)
+      
+      # Extract response text
+      response_text <- response_content$choices[[1]]$message$content
+      
+      # Debug print
+      print("Response received successfully")
+      print("Full response text:")
+      print(response_text)
+      
+      # Process responses with improved parsing
+      responses <- lapply(seq_along(prompts), function(i) {
+        # Call progress callback if provided
+        if (!is.null(progress_callback)) {
+          progress_callback(i, length(prompts))
+        }
+        
+        prompt <- prompts[i]
+        print(paste("Processing prompt", i, ":", prompt))
+        
+        # Split the response text into sections, trimming whitespace
+        response_sections <- strsplit(trimws(response_text), "\n\nPROMPT: ")[[1]]
+        
+        # For the first section, remove the "PROMPT: " prefix if it exists
+        response_sections[1] <- sub("^PROMPT: ", "", response_sections[1])
+        
+        # Find the matching section
+        matching_section <- NULL
+        for (section in response_sections) {
+          # Clean up the section text
+          clean_section <- gsub("^\\s+|\\s+$", "", section)
+          
+          # Check if the section starts with the current prompt
+          if (startsWith(clean_section, prompt)) {
+            matching_section <- clean_section
+            break
+          }
+        }
+        
+        if (!is.null(matching_section)) {
+          # Extract answer (everything between "ANSWER:" and "SOURCE:")
+          answer <- sub(".*\nANSWER: ([^\n]*).*", "\\1", matching_section)
+          if (answer == matching_section) answer <- "No answer found"
+          
+          # Extract source (everything between "SOURCE:" and "PAGE:")
+          source <- if (grepl("SOURCE:", matching_section)) {
+            source_text <- sub(".*SOURCE:\\s*([^\n]*).*", "\\1", matching_section)
+            if (source_text != matching_section) source_text else NULL
+          } else NULL
+          
+          # Extract page (everything after "PAGE:")
+          page <- if (grepl("PAGE:", matching_section)) {
+            page_text <- sub(".*PAGE:\\s*([^\n]*).*", "\\1", matching_section)
+            if (page_text != matching_section) page_text else "N/A"
+          } else "N/A"
+          
+          return(list(
+            answer = answer,
+            source = source,
+            page = page
+          ))
+        } else {
+          print(paste("No section found for prompt:", prompt))
+          print("Debugging details:")
+          print("Available sections:")
+          for (j in seq_along(response_sections)) {
+            print(paste(j, ":", substr(response_sections[j], 1, 100)))
+          }
+          
+          return(list(
+            answer = "No response found for this prompt",
+            source = NULL,
+            page = NULL
+          ))
+        }
+      })
+      
+      return(responses)
+      
+    }, error = function(e) {
+      # Comprehensive error handling
+      print("Critical error in OpenRouter API call:")
+      print(e$message)
+      
+      # Return placeholder responses
+      return(lapply(prompts, function(x) list(
+        answer = paste("API Error:", e$message),
+        source = NULL,
+        page = NULL
+      )))
+    })
+    
+    return(result)
+  }
+  
+  ### OpenRouter Save settings ----
+  observeEvent(input$saveSettingsOpenRouter, {
+    # Read the existing config while preserving comments and structure
+    if(file.exists("config.yml")){
+      current_config <- yaml::read_yaml("config.yml")
+    } else {
+      # Default config if file doesn't exist
+      current_config <- list(
+        api = list(
+          gemini = list(
+            model = "gemini-1.5-flash",
+            api_key = "your_gemini_api_key",
+            rate_limits = list(requests_per_minute = 2, requests_per_day = 1500)
+          ),
+          mistral = list(
+            model = "mistral-large-latest",
+            api_key = "your_mistral_api_key",
+            rate_limits = list(requests_per_minute = 2)
+          ),
+          openrouter = list(
+            model = "enter your model",
+            api_key = "your_open_router_api_key",
+            rate_limits = list(requests_per_minute = 2)
+          )
+        )
+      )
+    }
+    
+    # Only update the specific values we want to change
+    current_config$api$openrouter$api_key <- input$apiKeyOpenRouter
+    current_config$api$openrouter$model <- input$modelSelectOpenRouter
+    
+    ### OpenRouter write config.yml ----
+    write_config(current_config)
+    
+    showNotification("API Settings saved successfully", type = "message")
+  })
+
   
 }
   # Run the Shiny app

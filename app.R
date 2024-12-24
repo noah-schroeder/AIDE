@@ -971,16 +971,25 @@ PROMPTS:
             # Extract source
             source <- if (source_start > 0) {
               end_pos <- if (page_start > 0) page_start else nchar(matching_section)
-              trimws(substr(matching_section, 
-                            source_start + attr(regexpr("\\*\\*SOURCE:\\*\\*", matching_section), "match.length"),
-                            end_pos - 1))
+              source_text <- trimws(substr(matching_section, 
+                                           source_start + attr(regexpr("\\*\\*SOURCE:\\*\\*", matching_section), "match.length"),
+                                           end_pos - 1))
+              # Clean up the source text
+              source_text <- gsub("^SOURCE:\\s*", "", source_text)  # Remove SOURCE: prefix
+              source_text <- gsub("\\s*PAGE:.*$", "", source_text)  # Remove PAGE: and everything after
+              source_text <- gsub("\n.*", "", source_text)  # Remove any newlines and text after
+              source_text
             } else NULL
             
             # Extract page
             page <- if (page_start > 0) {
-              trimws(substr(matching_section, 
-                            page_start + attr(regexpr("\\*\\*PAGE:\\*\\*", matching_section), "match.length"),
-                            nchar(matching_section)))
+              page_text <- trimws(substr(matching_section, 
+                                         page_start + attr(regexpr("\\*\\*PAGE:\\*\\*", matching_section), "match.length"),
+                                         nchar(matching_section)))
+              # Clean up the page text
+              page_text <- gsub("^PAGE:\\s*", "", page_text)  # Remove PAGE: prefix
+              page_text <- gsub("\n.*", "", page_text)  # Remove any newlines and text after
+              if (page_text == "") "N/A" else page_text
             } else "N/A"
             
             return(list(

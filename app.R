@@ -407,7 +407,6 @@ ui <- dashboardPage(
                     style = "display: flex; flex-direction: column; gap: 8px;",    
                     p("1) Mistral has a very generous experimental/research API at the time this app was created (December, 2024). The full list of models is here:", HTML('<a href="https://docs.mistral.ai/getting-started/models/models_overview/" target="_blank" style="display: inline;">Mistral Models.</a>'), "We have only included models that have a 128K or larger context window."),
                     p("2) Since we are sending text data only, and at least as of December 2024 Mistral allowed those with free API key usage to use all models, we recommend using Mistral Large as we have had very good results with it."),    
-                    p("3) In our testing, Mistral models do not always reply in the required format precisely such that our parsing can pick it up correctly. Consequently, that the 'source' button on the analyze page may not always work. Otherwise the models have performed well."),    
                     )
                 )
               ),
@@ -677,7 +676,7 @@ server <- function(input, output, session) {
       # Show modal with custom button for file selection
       showModal(modalDialog(
         title = "Select Save Location",
-        "Please select where to save the responses. It's recommended to select the same file you just uploaded.",
+        "Please select where to save the responses (the popup may be in your taskbar if it did not pop up on the screen). It's recommended to select the same file you just uploaded.",
         footer = actionButton("proceedToFileSelect", "OK")
       ))
       
@@ -1144,29 +1143,57 @@ PROMPTS:
                             end_pos - 1))
             } else "No answer found"
             
-            # Extract source
+            # Extract source and page
             source <- if (source_start > 0) {
               end_pos <- if (page_start > 0) page_start else nchar(matching_section)
               source_text <- trimws(substr(matching_section, 
                                            source_start + attr(regexpr("\\*\\*SOURCE:\\*\\*", matching_section), "match.length"),
                                            end_pos - 1))
-              # Clean up the source text
-              source_text <- gsub("^SOURCE:\\s*", "", source_text)  # Remove SOURCE: prefix
-              source_text <- gsub("\\s*PAGE:.*$", "", source_text)  # Remove PAGE: and everything after
-              source_text <- gsub("\n.*", "", source_text)  # Remove any newlines and text after
-              source_text
-            } else NULL
+              # Ensure source is returned even if empty
+              if (source_text == "") "No specific source provided" else source_text
+            } else "No source information available"
             
             # Extract page
             page <- if (page_start > 0) {
               page_text <- trimws(substr(matching_section, 
                                          page_start + attr(regexpr("\\*\\*PAGE:\\*\\*", matching_section), "match.length"),
                                          nchar(matching_section)))
-              # Clean up the page text
-              page_text <- gsub("^PAGE:\\s*", "", page_text)  # Remove PAGE: prefix
-              page_text <- gsub("\n.*", "", page_text)  # Remove any newlines and text after
-              if (page_text == "") "N/A" else page_text
-            } else "N/A"
+              # Extract the number from the source text if page is not explicitly provided
+              if (page_text == "" || page_text == "N/A") {
+                # Look for page numbers in the source text
+                page_match <- regexpr("page\\s+\\d+", source, ignore.case = TRUE)
+                if (page_match > 0) {
+                  page_num <- gsub("page\\s+", "", tolower(substr(source, page_match, 
+                                                                  page_match + attr(page_match, "match.length") - 1)))
+                  page_num
+                } else {
+                  "N/A"
+                }
+              } else {
+                page_text
+              }
+            } else {
+              # Try to extract page number from source if no explicit page marker
+              if (!is.null(source)) {
+                page_match <- regexpr("page\\s+\\d+", source, ignore.case = TRUE)
+                if (page_match > 0) {
+                  page_num <- gsub("page\\s+", "", tolower(substr(source, page_match, 
+                                                                  page_match + attr(page_match, "match.length") - 1)))
+                  page_num
+                } else {
+                  "N/A"
+                }
+              } else {
+                "N/A"
+              }
+            }
+            
+            # Return the result ensuring source is never NULL
+            return(list(
+              answer = answer,
+              source = if(is.null(source)) "No source information available" else source,
+              page = page
+            ))
             
             return(list(
               answer = answer,
@@ -1375,7 +1402,6 @@ PROMPTS:
   })
   
   
-  ## Dynamic observers for source buttons ----
   observe({
     for (i in seq_along(rv$prompts)) {
       local({
@@ -1392,82 +1418,101 @@ PROMPTS:
           
           # Extract source text and page number
           source_info <- rv$sources[[local_i]]
-          source_text <- gsub(".*SOURCE:\\s*(.+?)\\s*PAGE:.*", "\\1", source_info)
-          page_num <- as.numeric(gsub(".*PAGE:\\s*(\\d+).*", "\\1", source_info))
           
-          # First scroll to the correct page
+          # More robust source text extraction
+          source_text <- if (grepl("SOURCE:", source_info)) {
+            gsub(".*SOURCE:\\s*(.+?)\\s*(PAGE:|$)", "\\1", source_info)
+          } else {
+            source_info  # Use full text if no SOURCE: marker
+          }
+          
+          # More robust page number extraction
+          page_num <- if (grepl("PAGE:", source_info)) {
+            page_text <- gsub(".*PAGE:\\s*([^\\s]+).*", "\\1", source_info)
+            if (page_text == "N/A") {
+              "N/A"
+            } else {
+              as.numeric(page_text)
+            }
+          } else {
+            "N/A"
+          }
+          
+          # Modified JavaScript to handle "N/A" pages
+          scroll_js <- if (!identical(page_num, "N/A")) {
+            sprintf("
+              const container = document.querySelector('.pdf-container');
+              if (container) {
+                const pages = container.getElementsByTagName('img');
+                const pageIndex = %d;
+                const targetPage = pages[pageIndex];
+                if (targetPage) {
+                  targetPage.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              }", page_num - 1)
+          } else {
+            "" # Empty string for no scroll
+          }
+          
+          # Combine with the rest of your JavaScript
           runjs(sprintf("
-        const container = document.querySelector('.pdf-container');
-        if (container) {
-          const pages = container.getElementsByTagName('img');
-          const pageIndex = %d;
-          const targetPage = pages[pageIndex];
-          if (targetPage) {
-            targetPage.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        }
+            %s  // Scroll JS (might be empty)
 
-        // Close all other source info boxes first
-        const allInfoBoxes = document.querySelectorAll('[id^=source_info_]');
-        allInfoBoxes.forEach(box => {
-          if (box.id !== 'source_info_%d') {
-            box.parentElement.remove();
-          }
-        });
+            // Close all other source info boxes first
+            const allInfoBoxes = document.querySelectorAll('[id^=source_info_]');
+            allInfoBoxes.forEach(box => {
+              if (box.id !== 'source_info_%d') {
+                box.parentElement.remove();
+              }
+            });
 
-        // Toggle source info box
-        const sourceBtn = document.getElementById('source_%d');
-        let infoBox = document.getElementById('source_info_%d');
-        const buttonContainer = sourceBtn.parentElement;
+            // Toggle source info box
+            const sourceBtn = document.getElementById('source_%d');
+            let infoBox = document.getElementById('source_info_%d');
+            const buttonContainer = sourceBtn.parentElement;
 
-        if (!infoBox) {
-          // Create a wrapper div for the source info box
-          const wrapper = document.createElement('div');
-          wrapper.style.cssText = `
-            width: 100%%;
-            position: relative;
-            order: 1;
-          `;
+            if (!infoBox) {
+              const wrapper = document.createElement('div');
+              wrapper.style.cssText = `
+                width: 100%%;
+                position: relative;
+                order: 1;
+              `;
 
-          // Create info box if it doesn't exist
-          infoBox = document.createElement('div');
-          infoBox.id = 'source_info_%d';
-          infoBox.style.cssText = `
-            margin: 5px 0;
-            padding: 10px;
-            background-color: #f8f8f8;  /* Light gray background */
-            border: 1px solid #e8e8e8;  /* Matching border color */
-            border-radius: 4px;
-            font-size: 14px;
-            line-height: 1.4;
-            width: 100%%;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            box-sizing: border-box;
-          `;
-          infoBox.innerHTML = `
-            <strong>Source:</strong><br>
-            %s<br><br>
-            <strong>Page:</strong> %d
-          `;
+              infoBox = document.createElement('div');
+              infoBox.id = 'source_info_%d';
+              infoBox.style.cssText = `
+                margin: 5px 0;
+                padding: 10px;
+                background-color: #f8f8f8;
+                border: 1px solid #e8e8e8;
+                border-radius: 4px;
+                font-size: 14px;
+                line-height: 1.4;
+                width: 100%%;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                box-sizing: border-box;
+              `;
+              infoBox.innerHTML = `
+                <strong>Source:</strong><br>
+                %s<br><br>
+                <strong>Page:</strong> %s
+              `;
 
-          wrapper.appendChild(infoBox);
+              wrapper.appendChild(infoBox);
 
-          // Make sure the button container is flex
-          buttonContainer.style.cssText = `
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 10px;
-          `;
+              buttonContainer.style.cssText = `
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: 10px;
+              `;
 
-          // Insert the wrapper after the source button but before other elements
-          sourceBtn.insertAdjacentElement('afterend', wrapper);
-        } else {
-          // Remove info box if it exists
-          infoBox.parentElement.remove();
-        }
-      ", page_num - 1, local_i, local_i, local_i, local_i, source_text, page_num))
-          
+              sourceBtn.insertAdjacentElement('afterend', wrapper);
+            } else {
+              infoBox.parentElement.remove();
+            }
+          ", scroll_js, local_i, local_i, local_i, local_i, source_text, page_num))
         })
       })
     }

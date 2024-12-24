@@ -15,6 +15,8 @@ library(readxl)
 library(yaml)
 library(base64enc)
 
+source("config_helpers.R")
+
 # Load configuration from the parent directory
 config <- yaml::read_yaml(file = "config.yml")  # Adjusted path to config.yml
 
@@ -237,7 +239,7 @@ ui <- dashboardPage(
                   style = "display: flex; flex-direction: column; gap: 8px;",  
                   p("Choose the way you would like to interact with LLMs"),
                   selectInput("llmMethod", "",  
-                              choices = c("Google Gemini API", "Mistral API"),  
+                              choices = c("Google Gemini API", "Mistral API", "OpenRouter API"),  
                               selected = "Google Gemini API",  
                               width = "100%"),  
                 )
@@ -379,6 +381,7 @@ ui <- dashboardPage(
                   )    
                 )    
               ),   
+              
               
               
               # Upload Coding Form Button
@@ -792,39 +795,38 @@ server <- function(input, output, session) {
   })
   
   ### Gemini Save settings ----
-  observeEvent(input$saveSettings, {
-    # Read the existing config while preserving comments and structure
-    current_config <- yaml::read_yaml("config.yml")
+  observeEvent(input$saveSettings, {  
+    # Read the existing config while preserving comments and structure  
+    if(file.exists("config.yml")){  
+      current_config <- yaml::read_yaml("config.yml")  
+    } else {  
+      # Default config if file doesn't exist  
+      current_config <- list(  
+        api = list(  
+          gemini = list(  
+            model = "gemini-1.5-flash",  
+            api_key = "your_gemini_api_key",  
+            rate_limits = list(requests_per_minute = 2, requests_per_day = 1500)  
+          ),  
+          mistral = list(  
+            model = "mistral-large-latest",  
+            api_key = "your_mistral_api_key",  
+            rate_limits = list(requests_per_minute = 2)  
+          )  
+        )  
+      )  
+    }  
     
-    # Only update the specific values we want to change
-    current_config$api$gemini$api_key <- input$apiKey
-    current_config$api$gemini$model <- input$modelSelect  # if you have model selection
-    current_config$api$gemini$rate_limits$requests_per_minute <- input$requestsPerMinute
-    current_config$api$gemini$rate_limits$requests_per_day <- input$requestsPerDay
+    # Only update the specific values we want to change  
+    current_config$api$gemini$api_key <- input$apiKey  
+    current_config$api$gemini$model <- input$modelSelect  
+    current_config$api$gemini$rate_limits$requests_per_minute <- input$requestsPerMinute  
+    current_config$api$gemini$rate_limits$requests_per_day <- input$requestsPerDay  
     
-    ### Gemini write config.yml ----
-    writeLines(
-      paste0(
-        "api:\n",
-        "  gemini:\n",
-        "    base_url: \"", "https://generativelanguage.googleapis.com/v1beta", "\"\n",
-        "    model: \"", current_config$api$gemini$model, "\"\n",
-        "    api_key: \"", current_config$api$gemini$api_key, "\"\n",
-        "    rate_limits:\n",
-        "      requests_per_minute: ", current_config$api$gemini$rate_limits$requests_per_minute, "\n", 
-        "      requests_per_day: ", current_config$api$gemini$rate_limits$requests_per_day, "\n",
-        "  mistral:\n",
-        "    base_url: \"", "https://api.mistral.ai/v1", "\"\n",
-        "    model: \"", current_config$api$mistral$model, "\"\n",
-        "    api_key: \"", current_config$api$mistral$api_key, "\"\n",
-        "    rate_limits:\n",
-        "      requests_per_minute: ", current_config$api$mistral$rate_limits$requests_per_minute, "\n", 
-        "\n\n"
-      ),
-      "config.yml"
-    )
+    ### Gemini write config.yml ----  
+    write_config(current_config)  
     
-    showNotification("API Settings saved successfully", type = "message")
+    showNotification("API Settings saved successfully", type = "message")  
   })
   
   #### Gemini calls ----
@@ -1887,41 +1889,40 @@ If no direct source is found, explain your reasoning.",
   }
   
   ### Mistral Save settings ----
-  observeEvent(input$saveSettingsMistral, {
-    # Read the existing config while preserving comments and structure
-    current_config <- yaml::read_yaml("config.yml")
+  observeEvent(input$saveSettingsMistral, {  
+    # Read the existing config while preserving comments and structure  
+    if(file.exists("config.yml")){  
+      current_config <- yaml::read_yaml("config.yml")  
+    } else {  
+      # Default config if file doesn't exist  
+      current_config <- list(  
+        api = list(  
+          gemini = list(  
+            model = "gemini-1.5-flash",  
+            api_key = "your_gemini_api_key",  
+            rate_limits = list(requests_per_minute = 2, requests_per_day = 1500)  
+          ),  
+          mistral = list(  
+            model = "mistral-large-latest",  
+            api_key = "your_mistral_api_key",  
+            rate_limits = list(requests_per_minute = 2)  
+          )  
+        )  
+      )  
+    }  
     
-    # Only update the specific values we want to change
-    current_config$api$mistral$api_key <- input$apiKeyMistral
-    current_config$api$mistral$model <- input$modelSelectMistral  
-
-    ### Mistral write config.yml ----
-    writeLines(
-      paste0(
-        "api:\n",
-        "  gemini:\n",
-        "    base_url: \"", "https://generativelanguage.googleapis.com/v1beta", "\"\n",
-        "    model: \"", current_config$api$gemini$model, "\"\n",
-        "    api_key: \"", current_config$api$gemini$api_key, "\"\n",
-        "    rate_limits:\n",
-        "      requests_per_minute: ", current_config$api$gemini$rate_limits$requests_per_minute, "\n", 
-        "      requests_per_day: ", current_config$api$gemini$rate_limits$requests_per_day, "\n",
-        "  mistral:\n",
-        "    base_url: \"", "https://api.mistral.ai/v1", "\"\n",
-        "    model: \"", current_config$api$mistral$model, "\"\n",
-        "    api_key: \"", current_config$api$mistral$api_key, "\"\n",
-        "    rate_limits:\n",
-        "      requests_per_minute: ", current_config$api$mistral$rate_limits$requests_per_minute, "\n", 
-        "\n\n"
-      ),
-      "config.yml"
-    )
+    # Only update the specific values we want to change  
+    current_config$api$mistral$api_key <- input$apiKeyMistral  
+    current_config$api$mistral$model <- input$modelSelectMistral    
     
-    showNotification("API Settings saved successfully", type = "message")
-  })
+    ### Mistral write config.yml ----  
+    write_config(current_config)  
+    
+    showNotification("API Settings saved successfully", type = "message")  
+  })  
+  
   
   
 }
-
-# Run the Shiny app
+  # Run the Shiny app
 shinyApp(ui = ui, server = server)

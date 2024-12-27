@@ -479,10 +479,6 @@ ui <- dashboardPage(
                           <li>Mythomax-l2-13b</li>  
                           <li>Microsoft Phi 3 Mini 128k Instruct</li>
                           <li>Mistral 7B Instruct (we recommend using Mistral API instead though, which uses larger models and produces better results in our testing.)</li>
-                        </ul>  
-                      "),
-                    HTML("Partially Working Models (source button likely won't work properly)  
-                        <ul>  
                           <li>Most Meta Llama 3, 3.1, or 3.2 model</li>  
                           <li>Microsoft Phi 3 Medium 128k Instruct</li>
                           <li>Open Chat 7B</li>
@@ -491,11 +487,15 @@ ui <- dashboardPage(
                           <li>Zephyr 7b Beta</li>
                         </ul>  
                       "), 
+                    HTML("Partially Working Models (source button will not work, but source is shown in R console)  
+                        <ul>  
+                          <li>Meta Llama 3.2 90b Vision Instruct</li>
+                          <li>Meta Llama 3.1 70b Instruct</li>
+                        </ul>  
+                      "), 
                     HTML("The following models will not work in this app:  
                         <ul>  
                           <li>Any Google Gemini Model (use the Gemini API in the app instead)</li>
-                          <li>Meta Llama 3.2 90b Vision Instruct</li>
-                          <li>Meta Llama 3.1 70b Instruct</li>
                         </ul>  
                       ")
                   )
@@ -2337,13 +2337,11 @@ PDF TEXT:
 PROMPTS:
 %s
 
-For EACH prompt, provide:
+IMPORTANT: For EACH prompt, you must provide:
 - PROMPT: [original prompt]
 - ANSWER: [comprehensive answer]
-- SOURCE: [exact supporting text from PDF, if applicable]
-- PAGE: [page number where source appears]
-
-If no direct source is found, explain your reasoning.",
+- SOURCE: [exact supporting text from PDF, if no direct text, explain reasoning]
+- PAGE: [page number where source appears]",
                             full_pdf_text,
                             paste(prompts, collapse = "\n")
           )

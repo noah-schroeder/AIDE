@@ -28,5 +28,5 @@ Totally up to you within the bounds of the App. We have had excellent results us
 ## Keep Your Config File & API Keys Secure
 You should keep your API key secure. Yes, the config file stores the API keys as plain text. Accordingly, you should NOT put your config file on Github or any other publicly accessible location. The gitignore file with this package is set to ignore .yml files, however if you clone/copy etc. this repo, you should ensure your config file stays ignored so your API key is not exposed. 
 
-## Do NOT Put This App Live As a Web-App Without Modifications
+## Do NOT Put This App Live As a Public-Facing Web Application Without Modifications
 The structure of the current code is not ideal for launching AIDE as a public-facing web application (e.g., on Shinyapps.io) due to the config file structure - it will not keep your API key secure or private. As such, I <strong>strongly recommend not launching AIDE as a public-facing web app without appropriate changes to the source code to secure API keys.</strong> I may update this later, but for now my personal opinion is that you should run AIDE on your local machine rather than a public-facing web-based application. 

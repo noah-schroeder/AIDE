@@ -20,7 +20,7 @@ To run AIDE on your local machine:
 *All the APIs listed above have a free tier as of December 2024, as well as a paid tier. If you're intending to use the free tier, be sure that is what you sign up for and use models that are compatable with the free tier.
 
 ## New To LLMs or API Keys?
-If you're new to API keys, this all may seem intimidating. Long story short, and API key is what let's you access a remote service (in this case, an LLM). There are free and paid versions. If you're new, I recommend using Google or Mistral, because I feel they make it easy to ensure you are staying with a free tier.
+If you're new to API keys, this all may seem intimidating. Long story short, an API key is what lets you access a remote service (in this case, an LLM). There are free and paid versions. If you're new, I recommend using Google or Mistral, because I feel they make it easy to ensure you are staying with a free tier.
 
 ## What LLM Should I Use? 
 Totally up to you within the bounds of the App. We have had excellent results using Gemini and Mistral Models. The free models from Open Router available to us during testing (December, 2024) did not have large enough context windows to be particularly useful for us. 

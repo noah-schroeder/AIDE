@@ -261,7 +261,7 @@ ui <- dashboardPage(
                 div(
                   style = "display: flex; flex-direction: column; gap: 8px;", # Reduc
                   strong("What LLM should I use?"),
-                  p("We have had excellent results with Google Gemini models. Mistral large also performs very well in our testing, however it has not always responded in a way where we can always parse the source. Open Router tends to offer smaller models, and they have not performed as well in our informal testing. For this reason, we suggest using either Gemini or Mistral models as of December 2024."),
+                  p("We have had excellent results with Google Gemini models. Mistral large also performs very well in our testing, however it has not always responded in a way where we can always parse the source. Open Router tends to offer smaller context windows on the free to use models and they have not performed as well in our informal testing. For this reason, we suggest using either Gemini or Mistral models as of December 2024."),
                   strong("What source text is sent to the LLM?"),
                   p("This app uses the pdftools package for R to extract structured text from the PDF. This means images are not sent to the LLM, and some formatting in the PDF may be lost. This is a necessary trade off because at this point (December 2024) you cannot send PDF files directly to many LLMs, many require text data."),
                   strong("What system and user prompts do you use?"),
@@ -285,6 +285,8 @@ ui <- dashboardPage(
                       </ul>"),
                   strong("Is each prompt an API call? How do I know how many times I'm sending a request to the API?"),
                   p("Each time you press \"Analyze\" on the analysis page it makes one API request. All prompts and the full text are built into one API request. "),
+                  strong("Anything else I should be aware of?"),
+                  p("Context window size. With the exception of Open Router free-tier models, which tend to offer small context windows (and therefore we do not recommend them for use with this app in many cases), we have tried to include models that have large (128K+) context windows. Keep in mind that the context window includes 1) the entire PDF text, 2) ALL of your prompts (because they're all sent at once in this app), 3) the LLM response. This means it is easy to have very large context sizes."),
                   strong("Can I see the direct responses from the API?"),
                   p("A lot of information prints in the R console for debugging purposes."),
                   ),

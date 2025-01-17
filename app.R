@@ -1747,6 +1747,93 @@ PROMPTS:
       # Small delay before removing modal
       Sys.sleep(0.5)
       removeModal()
+      
+      #modal
+      # Calculate context estimate  
+      context_est <- estimate_context_size(rv$pdf_text, rv$prompts)  
+      
+      # Show modal with context information  
+      showModal(modalDialog(  
+        title = "PDF Context Size Analysis",  
+        size = "l",  
+        
+        fluidRow(  
+          column(  
+            width = 6,  
+            div(  
+              h4("Estimated Context Size"),  
+              tags$ul(  
+                tags$li(  
+                  tags$strong("Total Tokens: "),   
+                  sprintf("%d", context_est$total_tokens)  
+                ),  
+                tags$li(  
+                  tags$strong("System Message: "),   
+                  sprintf("%d tokens", context_est$breakdown$system_message)  
+                ),  
+                tags$li(  
+                  tags$strong("PDF Content: "),   
+                  sprintf("%d tokens", context_est$breakdown$pdf_content)  
+                ),  
+                tags$li(  
+                  tags$strong("Prompts: "),   
+                  sprintf("%d tokens", context_est$breakdown$prompts)  
+                ),  
+                tags$li(  
+                  tags$strong("Template: "),   
+                  sprintf("%d tokens", context_est$breakdown$template)  
+                )  
+              )  
+            )  
+          ),  
+          column(  
+            width = 6,  
+            div(  
+              h4("Model Context Window Sizes"),  
+              tags$table(  
+                class = "table table-bordered",  
+                style = "margin-top: 20px;",  
+                tags$thead(  
+                  tags$tr(  
+                    tags$th("Model"),  
+                    tags$th("Context Size"),  
+                    tags$th("Status")  
+                  )  
+                ),  
+                tags$tbody(  
+                  lapply(context_est$model_compatibility, function(model) {  
+                    tags$tr(  
+                      tags$td(model$name),  
+                      tags$td(model$description),  
+                      tags$td(  
+                        div(  
+                          style = sprintf(  
+                            "color: white; background-color: %s; padding: 4px 8px; border-radius: 4px; text-align: center;",  
+                            if(model$compatible) "#28a745" else "#dc3545"  
+                          ),  
+                          if(model$compatible) "Within Context Window" else "Exceeds Context Window"  
+                        )  
+                      )  
+                    )  
+                  })  
+                )  
+              )  
+            )  
+          )  
+        ),  
+        
+        if(context_est$exceeds_context) {  
+          div(  
+            style = "margin-top: 20px; padding: 10px; background-color: #fff3cd; border: 1px solid #ffeeba; border-radius: 4px;",  
+            icon("exclamation-triangle"),   
+            "Warning: This document exceeds some model context limits. Consider using a model with larger context window."  
+          )  
+        },  
+        
+        footer = tagList(  
+          modalButton("Close")  
+        )  
+      ))
     })
   })
   
@@ -1978,7 +2065,7 @@ If no direct source is found, explain your reasoning.",
         )
       ),  
       temperature = 0.1,  
-      max_tokens = 8192  # Increased token limit  
+      max_tokens = 128000  # Increased token limit  
     )
     
     # Comprehensive API call with multiple error handling mechanisms
@@ -2501,6 +2588,160 @@ IMPORTANT: For EACH prompt, you must provide:
     showNotification("API Settings saved successfully", type = "message")
   })
 
+  
+  # Context estimate ---- 
+  observe({
+    req(rv$pdf_text, rv$prompts)
+    
+    # Calculate context size estimate
+    context_estimate <- estimate_context_size(rv$pdf_text, rv$prompts)
+    
+    # Store in reactive values
+    rv$context_estimate <- context_estimate
+    
+      })
+    
+  
+  estimate_context_size <- function(pdf_text, prompts) {
+    # Constants for token estimation
+    CHARS_PER_TOKEN <- 4  # Rough estimate, actual ratio varies by model/text
+    
+    # System message size (fixed)
+    system_msg <- "You are an expert PDF analyzer. You will process multiple prompts about this document."
+    system_tokens <- nchar(system_msg) / CHARS_PER_TOKEN
+    
+    # PDF text size
+    pdf_text_combined <- paste(pdf_text, collapse = "\n")
+    pdf_tokens <- nchar(pdf_text_combined) / CHARS_PER_TOKEN
+    
+    # Prompts size
+    prompts_combined <- paste(prompts, collapse = "\n")
+    prompts_tokens <- nchar(prompts_combined) / CHARS_PER_TOKEN
+    
+    # Template text size (fixed parts of the message)
+    template_text <- "Analyze this PDF text and answer ALL of the following prompts:
+PDF TEXT:
+PROMPTS:
+For EACH prompt, provide:
+- PROMPT: [original prompt]
+- ANSWER: [comprehensive answer]
+- SOURCE: [exact supporting text from PDF, if applicable]
+- PAGE: [page number where source appears]
+If no direct source is found, explain your reasoning."
+    template_tokens <- nchar(template_text) / CHARS_PER_TOKEN
+    
+    # Total token estimate
+    total_tokens <- ceiling(system_tokens + pdf_tokens + prompts_tokens + template_tokens)
+    
+    # Define model context windows
+    models <- list(
+      "Gemini 1.5 Flash" = list(
+        context_size = 1000000,
+        description = "1 million tokens"
+      ),
+      "Gemini 1.5 Pro" = list(
+        context_size = 2000000,
+        description = "2 million tokens"
+      ),
+      "Mistral Large 2" = list(
+        context_size = 128000,
+        description = "128k tokens"
+      ),
+      "Open Router Models" = list(
+        context_size = 8000,
+        description = "often 8k tokens (free tier)"
+      )
+    )
+    
+    # Check compatibility with each model
+    model_compatibility <- lapply(names(models), function(model_name) {
+      list(
+        name = model_name,
+        description = models[[model_name]]$description,
+        compatible = total_tokens <= models[[model_name]]$context_size,
+        context_size = models[[model_name]]$context_size
+      )
+    })
+    
+    # Create detailed breakdown
+    result <- list(
+      total_tokens = total_tokens,
+      breakdown = list(
+        system_message = ceiling(system_tokens),
+        pdf_content = ceiling(pdf_tokens),
+        prompts = ceiling(prompts_tokens),
+        template = ceiling(template_tokens)
+      ),
+      exceeds_context = total_tokens > 128000,
+      model_compatibility = model_compatibility
+    )
+    
+    return(result)
+  }
+  
+  # Add an output to display the context size
+  output$contextSize <- renderUI({
+    req(rv$context_estimate)
+    
+    est <- rv$context_estimate
+    
+    fluidRow(
+      column(
+        width = 6,
+        div(
+          h4("Estimated Context Size"),
+          tags$ul(
+            tags$li(sprintf("Total Tokens: %d", est$total_tokens)),
+            tags$li(sprintf("System Message: %d tokens", est$breakdown$system_message)),
+            tags$li(sprintf("PDF Content: %d tokens", est$breakdown$pdf_content)),
+            tags$li(sprintf("Prompts: %d tokens", est$breakdown$prompts)),
+            tags$li(sprintf("Template: %d tokens", est$breakdown$template))
+          ),
+          if(est$exceeds_context) {
+            div(
+              style = "color: red;",
+              "Warning: Context size exceeds Mistral Large 2 limit"
+            )
+          }
+        )
+      ),
+      column(
+        width = 6,
+        div(
+          h4("Model Context Window Sizes"),
+          tags$table(
+            class = "table table-bordered",
+            style = "margin-top: 20px;",
+            tags$thead(
+              tags$tr(
+                tags$th("Model"),
+                tags$th("Context Size"),
+                tags$th("Status")
+              )
+            ),
+            tags$tbody(
+              lapply(est$model_compatibility, function(model) {
+                tags$tr(
+                  tags$td(model$name),
+                  tags$td(model$description),
+                  tags$td(
+                    div(
+                      style = sprintf(
+                        "color: white; background-color: %s; padding: 4px 8px; border-radius: 4px; text-align: center;",
+                        if(model$compatible) "#28a745" else "#dc3545"
+                      ),
+                      if(model$compatible) "Within Context Window" else "Exceeds Context Window"
+                    )
+                  )
+                )
+              })
+            )
+          )
+        )
+      )
+    )
+  })
+  
   
 }
   # Run the Shiny app

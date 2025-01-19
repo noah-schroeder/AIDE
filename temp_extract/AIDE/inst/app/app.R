@@ -14,7 +14,7 @@ library(writexl)
 library(readxl)
 library(yaml)
 
-source("config_helpers.R")
+source(system.file("app/config_helpers.R", package = "AIDE"))
 
 # Load configuration from the parent directory
 config <- yaml::read_yaml(file = "config.yml")  # Adjusted path to config.yml

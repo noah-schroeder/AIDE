@@ -1,0 +1,22 @@
+api:
+  gemini:
+    base_url: "https://generativelanguage.googleapis.com/v1beta"
+    model: "gemini-1.5-pro"
+    api_key: "Your-API-Key"
+    rate_limits:
+      requests_per_minute: 2
+      requests_per_day: 50
+  mistral:
+    base_url: "https://api.mistral.ai/v1"
+    model: "mistral-large-latest"
+    api_key: "Your-API-Key"
+    rate_limits:
+      requests_per_minute: 2
+  openrouter:
+    base_url: "https://openrouter.ai/api/v1"
+    model: "mistralai/mistral-7b-instruct:free"
+    api_key: "Your-API-Key"
+    rate_limits:
+      requests_per_minute: 2
+      
+      

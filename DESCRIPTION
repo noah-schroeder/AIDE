@@ -1,0 +1,21 @@
+Package: AIDE
+Title: Ai-Assisted Data Extraction From PDFs
+Version: 0.0.0.9000
+Authors@R: 
+    person("Noah", "Schroeder", , "noah.schroeder2@gmail.com", role = c("aut", "cre"))
+Description: This package helps you use large langage models to extract data from PDFs and record them to coding forms. This was designed for systematic review and meta-analysis workflows.
+License: GPL (>= 3)
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Imports: 
+    config,
+    httr,
+    jsonlite,
+    pdftools,
+    shiny,
+    shinydashboard,
+    shinyjs,
+    utils
+Depends: 
+    tidyverse

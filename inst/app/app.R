@@ -13,6 +13,7 @@ library(base64enc)
 library(writexl)
 library(readxl)
 library(yaml)
+library(ollamar)
 
 source(system.file("app/config_helpers.R", package = "AIDE"))
 
@@ -302,7 +303,7 @@ ui <- dashboardPage(
                   style = "display: flex; flex-direction: column; gap: 8px;",  
                   p("Choose the way you would like to interact with LLMs"),
                   selectInput("llmMethod", "",  
-                              choices = c("Google Gemini API", "Mistral API", "OpenRouter API"),  
+                              choices = c("Google Gemini API", "Local Models with Ollama", "Mistral API", "OpenRouter API"),  
                               selected = "Google Gemini API",  
                               width = "100%"),  
                 )
@@ -551,6 +552,77 @@ ui <- dashboardPage(
                 )    
               ),   
               
+              #Ollama Selection----
+              conditionalPanel(    
+                condition = "input.llmMethod == 'Local Models with Ollama'",    
+                box(    
+                  width = 12,    
+                  title = "Local LLM with Ollama Notes",    
+                  div(    
+                    style = "display: flex; flex-direction: column; gap: 8px;",    
+                    p("1) Not all local LLMs perform the same for this task. With this app's backend strategy, you should focus on models with large context windows (32k or higher)."), 
+                    p("2) Ollama models should be downloaded in Ollama before starting the app."),
+                    p("3) You must copy-paste in the Open Router model name in the box below. We do not have a dropdown menu because they may change what models are available."),
+                    p("5) Ollama provides access to a large number of models by a number of different companies. Not all conform to the same API standards. Therefore, there is no guarantee that this app can utilize and parse the responses from any specific LLM. At the time of development (December, 2024), we tested the following models:"),
+                    HTML("Generally Working Models (not guaranteed) that run acceptably on 8GB Vram GeForce RTX 4060 GPU:
+                        <ul>  
+                          <li>Granite3.1-dense (2b) - 128k context length</li>  
+                          <li>llama 3.1 (8b) - 128k context length</li>
+                          <li>mistral-nemo (12b) - 128k context length</li>
+                        </ul>  
+                      "), 
+                    HTML("Partially Working Models (source button will not work, but source is shown in R console)  
+                        <ul>  
+                          <li>Meta Llama 3.2 90b Vision Instruct</li>
+                          <li>Meta Llama 3.1 70b Instruct</li>
+                        </ul>  
+                      "), 
+                    HTML("The following models will not work in this app:  
+                        <ul>  
+                          <li>Any Google Gemini Model (use the Gemini API in the app instead)</li>
+                        </ul>  
+                      ")
+                  )
+                ),
+                
+                box(    
+                  width = 6,    
+                  title = "Ollama Model Settings",    
+                  div(    
+                    style = "display: flex; flex-direction: column; gap: 8px;",    
+                    div(        
+                      style = "margin-bottom: 10px; display: flex; align-items: center; gap: 10px;",        
+                      h4("Ollama Server Status:", style = "margin: 0;"), # margin: 0 removes default margins  
+                      htmlOutput("ollamaStatus")    
+                    ),        
+                    
+                    # Model Selection    
+                    div(    
+                      style = "margin-bottom: 10px;",    
+                      uiOutput("dynamicModelSelect")    
+                    ),    
+                    
+                    # Explore Models Button    
+                    div(    
+                      style = "margin-bottom: 10px;",    
+                      tags$a(    
+                        href = "https://ollama.com/search",    
+                        target = "_blank",    
+                        class = "btn btn-default",    
+                        icon("search"),    
+                        "Explore Ollama Models"    
+                      )    
+                    ),    
+                    
+                    # Save Settings Button    
+                    uiOutput("containerStatus"),  
+                    
+                    uiOutput("saveButtonOllama"),   
+                    uiOutput("modelTestStatus"),
+                  )    
+                )    
+              ),  
+              
               # Upload Coding Form Button
               box(
                 width = 6,
@@ -563,6 +635,7 @@ ui <- dashboardPage(
                             width = "100%")
                 ),
               ),
+              
       ),
       
       ## Analysis ----
@@ -632,6 +705,10 @@ server <- function(input, output, session) {
     sources = list(),
     pages = list(),
     codingForm = NULL,
+    model_activated = FALSE,  
+    model_test_status = NULL,
+    is_processing = FALSE,
+    selected_ollama_model = NULL
   )
   mistral_key_valid <- reactiveVal(FALSE)
   current_row <- reactiveVal(NULL)
@@ -1259,7 +1336,8 @@ PROMPTS:
     analysis_function <- switch(input$llmMethod,  
                                 "Google Gemini API" = analyze_with_gemini,  
                                 "Mistral API" = analyze_with_mistral,
-                                "OpenRouter API" = analyze_with_openrouter)
+                                "OpenRouter API" = analyze_with_openrouter,
+                                "Local Models with Ollama" = analyze_with_ollama)
     
     # Reset previous results with empty lists
     rv$sources <- list()
@@ -1320,19 +1398,36 @@ PROMPTS:
       
       total_prompts <- length(rv$prompts)
       
-      responses <- analysis_function(  
-        pdf_text = rv$pdf_text,  
-        prompts = rv$prompts,  
-        config = config,  
-        progress_callback = function(current, total) {  
-          # Update progress bar  
-          progress_pct <- (current/total) * 100  
-          runjs(sprintf("  
-          $('.progress-bar').css('width', '%s%%');  
-          $('#progress-detail').text('Processing prompt %d of %d');  
-        ", progress_pct, current, total))  
-        }  
-      )
+      responses <- if (input$llmMethod == "Local Models with Ollama") {
+        analysis_function(  
+          pdf_text = rv$pdf_text,  
+          prompts = rv$prompts,
+          selected_model = input$selectedOllamaModel,
+          context_window = input$contextWindow,
+          progress_callback = function(current, total) {  
+            # Update progress bar  
+            progress_pct <- (current/total) * 100  
+            runjs(sprintf("  
+        $('.progress-bar').css('width', '%s%%');  
+        $('#progress-detail').text('Processing prompt %d of %d');  
+      ", progress_pct, current, total))  
+          }  
+        )
+      } else {
+        analysis_function(  
+          pdf_text = rv$pdf_text,  
+          prompts = rv$prompts,  
+          config = config,  
+          progress_callback = function(current, total) {  
+            # Update progress bar  
+            progress_pct <- (current/total) * 100  
+            runjs(sprintf("  
+        $('.progress-bar').css('width', '%s%%');  
+        $('#progress-detail').text('Processing prompt %d of %d');  
+      ", progress_pct, current, total))  
+          }  
+        )
+      }
       
       # Debug print responses
       print("Received responses:")
@@ -1786,8 +1881,21 @@ PROMPTS:
                   tags$strong("Template: "),   
                   sprintf("%d tokens", context_est$breakdown$template)  
                 )  
-              )  
-            )  
+              ),
+              conditionalPanel(  
+                condition = "input.llmMethod == 'Local Models with Ollama' || input.llmMethod == 'OpenRouter API'",
+              h2("Set Context Window:"), 
+              p("IMPORTANT: Different models have different context windows. Do not exceed the context window of your model. Changing your context window will also influence the hardware requirements if you are running local models with Ollama."),
+              numericInput(  
+                "contextWindow",  
+                "Context Window Size",  
+                value = 32000,  
+                min = 2048,  
+                max = 4000000,  
+                step = 1024  
+              ),  
+            )
+            )
           ),  
           column(  
             width = 6,  
@@ -2706,12 +2814,6 @@ If no direct source is found, explain your reasoning."
             tags$li(sprintf("Prompts: %d tokens", est$breakdown$prompts)),
             tags$li(sprintf("Template: %d tokens", est$breakdown$template))
           ),
-          if(est$exceeds_context) {
-            div(
-              style = "color: red;",
-              "Warning: Context size exceeds Mistral Large 2 limit"
-            )
-          }
         )
       ),
       column(
@@ -2750,6 +2852,290 @@ If no direct source is found, explain your reasoning."
       )
     )
   })
+  
+  #Ollama----
+  # Function to check Ollama server status  
+  check_ollama_status <- function() {  
+    tryCatch({  
+      # Use system command to check Ollama server  
+      status <- system2("ollama", "list", stdout = TRUE, stderr = TRUE)  
+      
+      # If command succeeds, server is running  
+      if (length(status) > 0) {  
+        return(list(  
+          status = TRUE,   
+          message = "Ollama server is running ✓"  
+        ))  
+      } else {  
+        return(list(  
+          status = FALSE,   
+          message = "Ollama server is not running ✗"  
+        ))  
+      }  
+    }, error = function(e) {  
+      return(list(  
+        status = FALSE,   
+        message = "Error checking Ollama server ✗"  
+      ))  
+    })  
+  }  
+  
+  # Function to get available Ollama models  
+  get_ollama_models <- function() {
+    tryCatch({
+      # Use system command to list Ollama models
+      models <- system2("ollama", "list", stdout = TRUE, stderr = TRUE)
+      
+      if (length(models) > 1) {
+        # Parse model names, skipping the header line
+        parsed_models <- sapply(models[-1], function(model_line) {
+          # Split the line by whitespace and take the first element
+          model_name <- strsplit(trimws(model_line), "\\s+")[[1]][1]
+          return(model_name)
+        })
+        
+        return(parsed_models)
+      } else {
+        return(c("No models found"))
+      }
+    }, error = function(e) {
+      return(c("Error retrieving models"))
+    })
+  }
+  
+  # Reactive Ollama status  
+  ollama_status <- reactive({  
+    check_ollama_status()  
+  })  
+  
+  # Output Ollama server status  
+  output$ollamaStatus <- renderUI({  
+    status <- ollama_status()  
+    if (status$status) {  
+      tags$span(  
+        style = "color: green; font-weight: bold;",   
+        status$message  
+      )  
+    } else {  
+      tags$span(  
+        style = "color: red; font-weight: bold;",   
+        status$message  
+      )  
+    }  
+  })  
+  
+  # Observe model selection changes  
+  observeEvent(input$selectedOllamaModel, {  
+    # Reset activation status when model changes  
+    rv$model_activated <- FALSE    
+    rv$model_test_status <- ""  
+  })
+  
+  # Dynamic Model Selection  
+  output$dynamicModelSelect <- renderUI({
+    req(input$llmMethod == 'Local Models with Ollama')
+    
+    models <- get_ollama_models()
+    
+    selectInput(
+      inputId = "selectedOllamaModel", 
+      label = "Select Ollama Model", 
+      choices = setNames(models, models),  # This ensures the displayed text matches the value
+      selected = models[1]
+    )
+  })
+  
+  # Render the save/test button
+  output$saveButtonOllama <- renderUI({
+    actionButton(
+      "saveOllamaSettings",
+      if(rv$is_processing) "Processing..." else "Activate Model and Send Test Message",
+      icon = if(rv$is_processing) icon("spinner", class = "fa-spin") else icon("save"),
+      style = paste(
+        "color: #fff;",
+        "background-color:", if(rv$is_processing) "#6c757d" else "#337ab7", ";",
+        "border-color:", if(rv$is_processing) "#6c757d" else "#2e6da4", ";"
+      ),
+      disabled = rv$is_processing
+    )
+  })
+  
+  # Save Ollama Settings      
+  observeEvent(input$saveOllamaSettings, {    
+    req(input$selectedOllamaModel)    
+    
+    # Set processing state first
+    rv$is_processing <- TRUE
+    
+    Sys.sleep(0.1)
+    
+    tryCatch({    
+      messages <- list(    
+        list(    
+          role = "user",    
+          content = "Hello, can you understand and respond to this message?"    
+        )    
+      )    
+      
+      response <- chat(    
+        model = input$selectedOllamaModel,    
+        messages = messages,    
+        output = "text"    
+      )    
+      
+      # Update with actual response  
+      if (!is.null(response) && nchar(response) > 0) {    
+        rv$model_test_status <- paste("Response:", response)    
+      } else {    
+        rv$model_test_status <- "No response received from the model"    
+      }    
+      
+    }, error = function(e) {    
+      rv$model_test_status <- paste("Error:", conditionMessage(e))    
+    }, finally = {  
+      # Reset processing state
+      rv$is_processing <- FALSE
+    })    
+  })
+  
+  # Render the status messages    
+  output$modelTestStatus <- renderUI({    
+    req(rv$model_test_status)  
+    
+    div(    
+      style = "padding: 10px;     
+           background-color: #f0f0f0;     
+           border-radius: 5px;     
+           margin-top: 10px;",    
+      div(    
+        tags$strong("Model Response:"),    
+        tags$br(),    
+        tags$span(  
+          style = "color: #333;",   
+          rv$model_test_status  
+        )    
+      )    
+    )    
+  })
+  
+  ## Analyze with Ollama ----
+  analyze_with_ollama <- function(pdf_text, prompts, selected_model, progress_callback = NULL, context_window = contextWindow) {  
+    responses <- list()  
+    
+    if (is.vector(pdf_text) && length(pdf_text) > 1) {
+      pdf_text <- paste(pdf_text, collapse = "\n")
+    }
+    
+    print(paste("Selected model:", selected_model))
+    print(paste("Using context window size:", context_window))
+    
+    for (i in seq_along(prompts)) {  
+      if (!is.null(progress_callback)) {  
+        progress_callback(i, length(prompts))  
+      }  
+      
+      prompt <- sprintf("Analyze this PDF text and answer ALL of the following prompts:
+
+PDF TEXT:
+%s
+
+PROMPTS:
+%s
+
+IMPORTANT: For EACH prompt, you must respond in this format:
+- PROMPT: [original prompt]
+- ANSWER: [comprehensive answer]
+- SOURCE: [exact supporting text from PDF, if no direct text, explain reasoning]
+- PAGE: [page number where source appears]",  
+                        pdf_text,  
+                        prompts[i])  
+      
+      # Create request body with context_window
+      request_body <- list(
+        model = selected_model,
+        prompt = as.character(prompt),
+        stream = FALSE,
+        options = list(
+          num_ctx = context_window
+        )
+      )
+      
+      print("Request body structure:")
+      print(str(request_body))
+      
+      api_response <- tryCatch({  
+        print("Attempting API call...")
+        
+        response <- httr::POST(
+          url = "http://localhost:11434/api/generate",
+          body = jsonlite::toJSON(request_body, auto_unbox = TRUE),
+          encode = "json",
+          httr::add_headers("Content-Type" = "application/json")
+        )
+        
+        # Debug print the response
+        print("Response status:")
+        print(httr::status_code(response))
+        
+        if (httr::status_code(response) != 200) {
+          error_content <- httr::content(response, "text")
+          print("Error response content:")
+          print(error_content)
+          stop(paste("HTTP", httr::status_code(response), "-", error_content))
+        }
+        
+        result <- jsonlite::fromJSON(httr::content(response, "text", encoding = "UTF-8"))
+        answer_text <- result$response
+        
+        # Parse the response to extract answer, source, and page  
+        source_match <- regexpr("SOURCE:\\s*([^\\n]+)", answer_text)  
+        page_match <- regexpr("PAGE:\\s*([^\\n]+)", answer_text)  
+        
+        answer <- if (source_match > 0) {  
+          substr(answer_text, 1, source_match - 1)  
+        } else {  
+          answer_text  
+        }  
+        
+        source <- if (source_match > 0) {  
+          source_text <- regmatches(answer_text, source_match)  
+          gsub("SOURCE:\\s*", "", source_text)  
+        } else {  
+          "Source not specified"  
+        }  
+        
+        page <- if (page_match > 0) {  
+          page_text <- regmatches(answer_text, page_match)  
+          gsub("PAGE:\\s*", "", page_text)  
+        } else {  
+          "N/A"  
+        }  
+        
+        list(  
+          answer = trimws(answer),  
+          source = trimws(source),  
+          page = trimws(page)  
+        )  
+        
+      }, error = function(e) {  
+        print("Error details:")
+        print(e$message)
+        if (!is.null(e$call)) print(paste("Function call:", e$call))
+        
+        list(  
+          answer = paste("Error:", e$message),  
+          source = "Error occurred",  
+          page = "N/A"  
+        )  
+      })  
+      
+      responses[[i]] <- api_response  
+      Sys.sleep(1)
+    }  
+    
+    return(responses)
+  }
+  
   
   
 }

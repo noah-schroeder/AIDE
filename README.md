@@ -6,7 +6,7 @@ This app is designed to facilitate human-in-the-loop data extraction from PDFs u
 Install R Package: 
 ```r
 #Install package from Github Repo
-devtools::install_github("noah-schroeder/AIDE")
+devtools::install_github("noah-schroeder/AIDE", dependencies = TRUE)
 
 #Load package
 library(AIDE)

@@ -230,7 +230,7 @@ ui <- dashboardPage(
                 title = "Welcome to AI-Assisted Data Extraction (AIDE)",
                 div(
                   style = "display: flex; flex-direction: column; gap: 8px;", # Reduced from 15px to 8px
-                  p("AIDE was developed to greatly accelerate the data extraction process for systematic review and meta-analysis. It relies on you having an API key for Google Gemini, Mistral, or Open Router (which all offer free tiers as of December 2024).",
+                  p("AIDE was developed to greatly accelerate the data extraction process for systematic review and meta-analysis. It relies on you either using local models via Ollama or having an API key for Google Gemini, Mistral, or Open Router (which all offer free tiers as of December 2024).",
                   ),
                 ),
               ),
@@ -239,6 +239,7 @@ ui <- dashboardPage(
                 title = "How to Use This App",
                 div(
                   style = "display: flex; flex-direction: column; gap: 8px;", # Reduc
+                  strong("LLMs via API"),
                   p("1) You will need an API key for the LLM provider of your choice (Google Gemini, Mistral, or Open Router). At the time this app was created (December, 2024), all three of the following providers offered free API tiers:", 
                     HTML("API Key Providers:  
                       <ul>  
@@ -250,19 +251,45 @@ ui <- dashboardPage(
                   p("2) Set up your coding form. Importantly, your first row will be read as prompts by the large language model. The accuracy of the LLM's responses will be influenced very strongly by your prompts. Better prompts = better results."),
                   p("3) Move to the LLM Setup tab of this app where you can continue with the following steps:"),
                   p("4) Upload your coding form. Your coding form should be in Excel format for best results."),
-                  p("4) Move to the analyze page and upload the PDF file you want to analyze."),
+                  p("4) Move to the analyze page and upload the PDF file you want to analyze. You will see a context size estimate - ensure it fits with the model you are using."),
                   p("5) Click Analyze button. Your results will autofill under the appropriate prompt."),
                   p("6) Review each response. You can view the source information by clicking the Source button. You can record each result by clicking the record button. This will save it to your coding form on your local machine."),
                   p("7) When ready to work on the next PDF, simply upload a new one and the coding form will reset."),
-                ),
+                  strong("LLMs via Ollama"),
+                  p("1) You will Ollama installed, as well as the LLM model you want to use downloaded to Ollama.", 
+                    HTML("Ollama:  
+                      <ul>  
+                        <li><a href='https://ollama.com/' target='_blank' style='display: inline;'>Ollama</a></li>  
+                        <li><a href='https://ollama.com/search' target='_blank' style='display: inline;'>Ollama Models</a></li>  
+                      </ul>")
+                  ),
+                  p("2) Set up your coding form. Importantly, your first row will be read as prompts by the large language model. The accuracy of the LLM's responses will be influenced very strongly by your prompts. Better prompts = better results."),
+                  p("3) Move to the LLM Setup tab of this app where you can continue with the following steps:"),
+                  p("4) Upload your coding form. Your coding form should be in Excel format for best results."),
+                  p("4) Move to the analyze page and upload the PDF file you want to analyze. You will see a context size estimate - ensure it fits with the model you are using. Then set your context window size."),
+                  p("5) Click Analyze button. The speed of the analysis will depend on a) your computer hardware, b) what is being analyzed, c) the context window size. Your results will autofill under the appropriate prompt."),
+                  p("6) Review each response. You can view the source information by clicking the Source button. You can record each result by clicking the record button. This will save it to your coding form on your local machine."),
+                  p("7) When ready to work on the next PDF, simply upload a new one and the coding form will reset."),
+                  ),
               ),
               box(
                 width = 6,
                 title = "Common Questions",
                 div(
                   style = "display: flex; flex-direction: column; gap: 8px;", # Reduc
+                  strong("How big of a context window do I need?"),
+                  p("We recommend models with a minimum of 32K context window. We have tried to include models that have large (128K+) context windows (Gemini, Mistral Large 2). Every time you upload a PDF, you'll see an estimated context window size. If you are running local models, you will be able to set your context size."),
                   strong("What LLM should I use?"),
-                  p("We have had excellent results with Google Gemini models. Mistral large also performs very well in our testing, however it has not always responded in a way where we can always parse the source. Open Router tends to offer smaller context windows on the free to use models and they have not performed as well in our informal testing. For this reason, we suggest using either Gemini or Mistral models as of December 2024."),
+                  p(
+                  HTML("General Thoughts:  
+                      <ul>  
+                      <li>We have had excellent results with Google Gemini models. Mistral large also performs very well in our testing.</li>  
+                      <li>Running local models with Ollama requires a bit of knowledge and a fair bit of computational resources. This feature is currently in beta because each local model responds differently, so it is challenging for this software parse the response and source information.</li>  
+                      <li>Mistral large performs very well in our testing.</li>  
+                      <li>Open Router's free tier tends to offer smaller context windows and consequently, these models have not performed well in our informal testing. For this reason, we suggest using either Gemini or Mistral models as of December 2024.</li>  
+                      </ul>")
+                    ),
+                  p("If you want to use a paid service, like ChatGPT or Claude, they are accessible through Open Router. However, as of December 2024 we have not yet tested if they reply in a way that this app can easily parse."),
                   strong("What source text is sent to the LLM?"),
                   p("This app uses the pdftools package for R to extract structured text from the PDF. This means images are not sent to the LLM, and some formatting in the PDF may be lost. This is a necessary trade off because at this point (December 2024) you cannot send PDF files directly to many LLMs, many require text data."),
                   strong("What system and user prompts do you use?"),
@@ -272,6 +299,12 @@ ui <- dashboardPage(
                         <ul>
                           <li>System prompt: None</li>
                           <li>User prompt: Analyze this PDF and answer ALL of the following prompts. For EACH prompt, you MUST provide... [continues into answer, source, page labels]</li>
+                        </ul>
+                        <li>Local Models with Ollama</li> 
+                        <ul>
+                          <li>System prompt: None</li>
+                          <li>User prompt: Analyze this PDF and answer ALL of the following prompts. IMPORTANT: For EACH prompt, you must respond in this format:
+ [continues into answer, source, page labels]</li>
                         </ul>
                         <li>Mistral</li> 
                         <ul>
@@ -286,8 +319,6 @@ ui <- dashboardPage(
                       </ul>"),
                   strong("Is each prompt an API call? How do I know how many times I'm sending a request to the API?"),
                   p("Each time you press \"Analyze\" on the analysis page it makes one API request. All prompts and the full text are built into one API request. "),
-                  strong("Anything else I should be aware of?"),
-                  p("Context window size. With the exception of Open Router free-tier models, which tend to offer small context windows (and therefore we do not recommend them for use with this app in many cases), we have tried to include models that have large (128K+) context windows. Keep in mind that the context window includes 1) the entire PDF text, 2) ALL of your prompts (because they're all sent at once in this app), 3) the LLM response. This means it is easy to have very large context sizes."),
                   strong("Can I see the direct responses from the API?"),
                   p("A lot of information prints in the R console for debugging purposes."),
                   ),
@@ -318,7 +349,7 @@ ui <- dashboardPage(
                   title = "Google Gemini API Notes",    
                   div(    
                     style = "display: flex; flex-direction: column; gap: 8px;",    
-                    p("1) The free tier of the Google Gemini API has rate limits. You can check current rate limits for the free tier here:", HTML('<a href="https://ai.google.dev/pricing" target="_blank" style="display: inline;">Google AI API Pricing.</a>'), "This app enforces a rate limit of 2 requests per minute, which is very conservative."),
+                    p("1) The free tier of the Google Gemini API has rate limits. You can check current rate limits for the free tier here:", HTML('<a href="https://ai.google.dev/pricing" target="_blank" style="display: inline;">Google AI API Pricing.</a>')),
                     p("2) There are a variety of different models available from Google, such as various versions of Gemini Flash and Gemini Pro. You can find the list of all models here:", HTML('<a href="https://ai.google.dev/gemini-api/docs/models/gemini" target="_blank" style="display: inline;">Google AI Models.</a>'), "Our experience during testing was that Gemini 1.5 Pro slightly outperformed Gemini 1.5 Flash, however 1.5 Flash was still very good!"),    
                     )
                 )
@@ -473,7 +504,7 @@ ui <- dashboardPage(
                     p("2) Open Router Models has limits on how much you can use free models per minute and per day:", 
                       HTML('<a href="https://openrouter.ai/docs/limits" target="_blank" style="display: inline;">Open Router Limits.</a>')),
                     p("3) You must copy-paste in the Open Router model name in the box below. We do not have a dropdown menu because they may change what models are available."),
-                    p("3) Note that different models are made for different things and not all will perform well for data extraction. In fact, of the freely available models from Open Router that we tested during development (December, 2024), none worked as well as the models available through the Gemini or Mistral APIs. However, this could be due to the free API providers limiting the context window. For example, at the time of development, Meta: Llama 3.1 405B Instruct (free) has a 128k context window, but the provider of the free access only allows 8k context window (input + output). This means that the average journal article may not fit within the context window, meaning the entire article would not be reviewed by the LLM. In our testing, it was common to only get responses based on the first page of the PDF. For this reason, for free models, we recommend Gemini or Mistral APIs at this time."),
+                    p("3) Note that different models are made for different things and not all will perform well for data extraction. In fact, of the freely available models from Open Router that we tested during development (December, 2024), none worked as well as the models available through the Gemini or Mistral APIs. However, this is likely due to the free API providers limiting the context window. For example, at the time of development, Meta: Llama 3.1 405B Instruct (free) has a 128k context window, but the provider of the free access only allows 8k context window (input + output). This means that the average journal article may not fit within the context window, meaning the entire article would not be reviewed by the LLM. In our testing, it was common to only get responses based on the first page of the PDF. For this reason, for free models, we recommend Gemini or Mistral APIs at this time."),
                     p("4) We have not tested any paid models. Use paid models at your own risk, there is no guarentee they will be compatible with this app."),
                     p("5) Open Router provides access to a large number of models by a number of different companies. Not all conform to the same API standards. Therefore, there is no guarantee that this app can utilize and parse the responses from any specific LLM. At the time of development (December, 2024), we tested the following models:"),
                     HTML("Generally Working Models (not guaranteed)  
@@ -560,28 +591,25 @@ ui <- dashboardPage(
                   title = "Local LLM with Ollama Notes",    
                   div(    
                     style = "display: flex; flex-direction: column; gap: 8px;",    
+                    box(h2("This feature is considered still in beta."),
+                    p("It works, but the huge variety of LLMs available means that not all models respond in a way where their response will be correctly parsed. Consequently, some models will place their entire response (prompt, answer, source) in the answer box in this software."),
+                    ),
                     p("1) Not all local LLMs perform the same for this task. With this app's backend strategy, you should focus on models with large context windows (32k or higher)."), 
                     p("2) Ollama models should be downloaded in Ollama before starting the app."),
-                    p("3) You must copy-paste in the Open Router model name in the box below. We do not have a dropdown menu because they may change what models are available."),
-                    p("5) Ollama provides access to a large number of models by a number of different companies. Not all conform to the same API standards. Therefore, there is no guarantee that this app can utilize and parse the responses from any specific LLM. At the time of development (December, 2024), we tested the following models:"),
-                    HTML("Generally Working Models (not guaranteed) that run acceptably on 8GB Vram GeForce RTX 4060 GPU:
+                    p("3) The Ollama models on your computer should appear in the model settings box below in the drop down menu."),
+                    p("5) Ollama provides access to a large number of models by a number of different companies. Not all conform to the same standards. Therefore, there is no guarantee that this app can utilize and parse the responses from any specific LLM."),
+                    strong("General Considerations Before Using Ollama Models"),
+                    HTML("LLM Requirements:
                         <ul>  
-                          <li>Granite3.1-dense (2b) - 128k context length</li>  
-                          <li>llama 3.1 (8b) - 128k context length</li>
-                          <li>mistral-nemo (12b) - 128k context length</li>
+                          <li>In our testing, a 32k context window is the absolute minimum that was viable. We would recommend 128k context length, but 32k worked for our use cases.</li>  
+                          <li>More parameters does not necessarily mean it will perform better.</li>
                         </ul>  
                       "), 
-                    HTML("Partially Working Models (source button will not work, but source is shown in R console)  
+                    HTML("Hardware Requirements:
                         <ul>  
-                          <li>Meta Llama 3.2 90b Vision Instruct</li>
-                          <li>Meta Llama 3.1 70b Instruct</li>
+                          <li>LLMs are very GPU-intensive. We tested small models (2b parameters) with a 32k context window. When we had ~20k total tokens, each prompt took approximately 2 minutes to generate a response when using a RTX GeFORCE 4060 (8gb VRAM) on a PC with 32GB RAM and a i5-13600k processor. This means completing a 5 variable coding form would take approximately 10 minutes on this machine. This is VERY slow compared to, for example, Gemini or Mistral models available through API.</li>
                         </ul>  
                       "), 
-                    HTML("The following models will not work in this app:  
-                        <ul>  
-                          <li>Any Google Gemini Model (use the Gemini API in the app instead)</li>
-                        </ul>  
-                      ")
                   )
                 ),
                 

@@ -21,7 +21,7 @@ source(system.file("app/config_helpers.R", package = "AIDE"))
 config <- read_config()
 
 # UI Definition ----
-ui <- dashboardPage(
+ui <- dashboardPage(title= "AI-Assisted Data Extraction",
   skin = "blue",
   
   # Header

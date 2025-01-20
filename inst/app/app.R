@@ -1851,67 +1851,80 @@ PROMPTS:
       context_est <- estimate_context_size(rv$pdf_text, rv$prompts)  
       
       # Show modal with context information  
-      showModal(modalDialog(  
-        title = "PDF Context Size Analysis",  
-        size = "l",  
+      showModal(modalDialog(
+        title = "PDF Context Size Analysis",
+        size = "l",
         
-        fluidRow(  
-          column(  
-            width = 6,  
-            div(  
-              h4("Estimated Context Size"),  
-              tags$ul(  
-                tags$li(  
-                  tags$strong("Total Tokens: "),   
-                  sprintf("%d", context_est$total_tokens)  
-                ),  
-                tags$li(  
-                  tags$strong("System Message: "),   
-                  sprintf("%d tokens", context_est$breakdown$system_message)  
-                ),  
-                tags$li(  
-                  tags$strong("PDF Content: "),   
-                  sprintf("%d tokens", context_est$breakdown$pdf_content)  
-                ),  
-                tags$li(  
-                  tags$strong("Prompts: "),   
-                  sprintf("%d tokens", context_est$breakdown$prompts)  
-                ),  
-                tags$li(  
-                  tags$strong("Template: "),   
-                  sprintf("%d tokens", context_est$breakdown$template)  
-                )  
-              ),
-              conditionalPanel(  
-                condition = "input.llmMethod == 'Local Models with Ollama' || input.llmMethod == 'OpenRouter API'",
-              h2("Set Context Window:"), 
-              p("IMPORTANT: Different models have different context windows. Do not exceed the context window of your model. Changing your context window will also influence the hardware requirements if you are running local models with Ollama."),
-              numericInput(  
-                "contextWindow",  
-                "Context Window Size",  
-                value = 32000,  
-                min = 2048,  
-                max = 4000000,  
-                step = 1024  
-              ),  
+        # First row with Context Size and Context Window settings
+        fluidRow(
+          # Left column for Estimated Context Size
+          column(
+            width = 6,
+            div(
+              h4("Estimated Context Size"),
+              p("*estimated as 4 characters = 1 token."),
+              tags$ul(
+                tags$li(
+                  tags$strong("Total Tokens: "),
+                  sprintf("%d", context_est$total_tokens)
+                ),
+                tags$li(
+                  tags$strong("System Message: "),
+                  sprintf("%d tokens", context_est$breakdown$system_message)
+                ),
+                tags$li(
+                  tags$strong("PDF Content: "),
+                  sprintf("%d tokens", context_est$breakdown$pdf_content)
+                ),
+                tags$li(
+                  tags$strong("Prompts: "),
+                  sprintf("%d tokens", context_est$breakdown$prompts)
+                ),
+                tags$li(
+                  tags$strong("Template: "),
+                  sprintf("%d tokens", context_est$breakdown$template)
+                )
+              )
             )
+          ),
+          # Right column for Context Window settings
+          column(
+            width = 6,
+            conditionalPanel(
+              condition = "input.llmMethod == 'Local Models with Ollama'",
+              div(
+                h4("Set Context Window"),
+                p("IMPORTANT: Different models have different context windows. Do not exceed the context window of your model. Changing your context window will also influence the hardware requirements if you are running local models with Ollama."),
+                numericInput(
+                  "contextWindow",
+                  "Context Window Size",
+                  value = 32000,
+                  min = 2048,
+                  max = 4000000,
+                  step = 1024
+                )
+              )
             )
-          ),  
-          column(  
-            width = 6,  
-            div(  
-              h4("Model Context Window Sizes"),  
-              tags$table(  
-                class = "table table-bordered",  
-                style = "margin-top: 20px;",  
-                tags$thead(  
-                  tags$tr(  
-                    tags$th("Model"),  
-                    tags$th("Context Size"),  
-                    tags$th("Status")  
-                  )  
-                ),  
-                tags$tbody(  
+          )
+        ),
+        
+        # Second row for Model Context Window Sizes
+        fluidRow(
+          column(
+            width = 12,  # Full width for the table
+            div(
+              h4("Model Context Window Sizes"),
+              tags$table(
+                class = "table table-bordered",
+                style = "margin-top: 20px;",
+                tags$thead(
+                  tags$tr(
+                    tags$th("Model"),
+                    tags$th("Context Size"),
+                    tags$th("Status")
+                  )
+                ),
+                tags$tbody(
                   lapply(context_est$model_compatibility, function(model) {  
                     tags$tr(  
                       tags$td(model$name),  
@@ -1920,30 +1933,43 @@ PROMPTS:
                         div(  
                           style = sprintf(  
                             "color: white; background-color: %s; padding: 4px 8px; border-radius: 4px; text-align: center;",  
-                            if(model$compatible) "#28a745" else "#dc3545"  
+                            if(model$name %in% c("Local Models with Ollama", "Open Router Models")) {  
+                              "#ffc107"  # yellow for Ollama and Open Router  
+                            } else if(model$compatible) {  
+                              "#28a745"  # green for others that are compatible  
+                            } else {  
+                              "#dc3545"  # red for others that exceed  
+                            }  
                           ),  
-                          if(model$compatible) "Within Context Window" else "Exceeds Context Window"  
+                          if(model$name %in% c("Local Models with Ollama", "Open Router Models")) {  
+                            "Varies by Model"  
+                          } else if(model$compatible) {  
+                            "Within Context Window"  
+                          } else {  
+                            "Exceeds Context Window"  
+                          }  
                         )  
                       )  
                     )  
-                  })  
-                )  
-              )  
-            )  
-          )  
-        ),  
+                  })
+                )
+              )
+            )
+          )
+        ),
         
-        if(context_est$exceeds_context) {  
-          div(  
-            style = "margin-top: 20px; padding: 10px; background-color: #fff3cd; border: 1px solid #ffeeba; border-radius: 4px;",  
-            icon("exclamation-triangle"),   
-            "Warning: This document exceeds some model context limits. Consider using a model with larger context window."  
-          )  
-        },  
+        # Warning message if context is exceeded
+        if(context_est$exceeds_context) {
+          div(
+            style = "margin-top: 20px; padding: 10px; background-color: #fff3cd; border: 1px solid #ffeeba; border-radius: 4px;",
+            icon("exclamation-triangle"),
+            "Warning: This document exceeds some model context limits. Consider using a model with larger context window."
+          )
+        },
         
-        footer = tagList(  
-          modalButton("Close")  
-        )  
+        footer = tagList(
+          modalButton("Close")
+        )
       ))
     })
   })
@@ -2760,13 +2786,17 @@ If no direct source is found, explain your reasoning."
         context_size = 2000000,
         description = "2 million tokens"
       ),
+      "Local Models with Ollama" = list(
+        context_size = "Varies by model",
+        description = "Varies by model"
+      ),
       "Mistral Large 2" = list(
         context_size = 128000,
         description = "128k tokens"
       ),
       "Open Router Models" = list(
-        context_size = 8000,
-        description = "often 8k tokens (free tier)"
+        context_size = "Varies by model",
+        description = "Varies by model"
       )
     )
     
@@ -2839,9 +2869,21 @@ If no direct source is found, explain your reasoning."
                     div(
                       style = sprintf(
                         "color: white; background-color: %s; padding: 4px 8px; border-radius: 4px; text-align: center;",
-                        if(model$compatible) "#28a745" else "#dc3545"
+                        if(model$name %in% c("Local Models with Ollama", "Open Router Models")) {
+                          "#ffc107"  # yellow for Ollama and Open Router
+                        } else if(model$compatible) {
+                          "#28a745"  # green for others that are compatible
+                        } else {
+                          "#dc3545"  # red for others that exceed
+                        }
                       ),
-                      if(model$compatible) "Within Context Window" else "Exceeds Context Window"
+                      if(model$name %in% c("Local Models with Ollama", "Open Router Models")) {
+                        "Varies by Model"
+                      } else if(model$compatible) {
+                        "Within Context Window"
+                      } else {
+                        "Exceeds Context Window"
+                      }
                     )
                   )
                 )

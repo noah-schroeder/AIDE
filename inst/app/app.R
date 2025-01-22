@@ -711,6 +711,35 @@ ui <- dashboardPage(title= "AI-Assisted Data Extraction",
                   )
                 )
               )
+      ),
+      tabItem("Cite",
+              
+              
+              
+              # UI component
+              box(
+                width = 12,
+                title = "Please cite AIDE if you use it in your research.",
+                div(
+                  style = "display: flex; flex-direction: column; gap: 8px;", # Reduced from 15px to 8px
+                  h3("bibtext"),
+                  p(
+                    HTML(
+                      "@misc{schroeder2025largelanguagemodelshumanintheloop<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;title={Large Language Models with Human-In-The-Loop Validation for Systematic Review Data Extraction},<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;author={Noah L. Schroeder and Chris Davis Jaldi and Shan Zhang},<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;year={2025},<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;eprint={2501.11840},<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;archivePrefix={arXiv},<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;primaryClass={cs.HC},<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;url={https://arxiv.org/abs/2501.11840},<br>
+    }"
+                    )
+                  ),
+                  h3("APA"),
+                  p("Schroeder, N. L., Jaldi, C. D., & Zhang, S. (2025). Large Language Models with Human-In-The-Loop Validation for Systematic Review Data Extraction. https://doi.org/10.48550/arXiv.2501.11840"),
+                ),
+              ),
       )
     )
   )

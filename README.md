@@ -2,7 +2,7 @@
 This app is designed to facilitate human-in-the-loop data extraction from PDFs using large language models (LLMs). Currently (Dec. 2024) the LLMs available are Google Gemini models, Local models via Ollama, Mistral models, and models available through Open Router. 
 
 ## Quick Start: To Run AIDE -
-### Simple Version (no code exposure)
+### Simple Package Installation
 Install R Package: 
 ```r
 #Install package from Github Repo

@@ -1099,47 +1099,106 @@ server <- function(input, output, session) {
   
   ### Gemini Save settings ----
   observeEvent(input$saveSettings, {
-    # Get the user-specific config path
-    config_path <- get_config_path()
+    # Input validation
+    req(input$apiKey, input$modelSelect, 
+        input$requestsPerMinute, input$requestsPerDay)
     
-    # Read the existing config
-    if(file.exists(config_path)) {
-      current_config <- yaml::read_yaml(config_path)
-    } else {
-      # Default config if file doesn't exist
-      current_config <- list(
-        api = list(
-          gemini = list(
-            model = "gemini-1.5-flash",
-            api_key = "your_gemini_api_key",
-            rate_limits = list(requests_per_minute = 2, requests_per_day = 1500)
-          ),
-          mistral = list(
-            model = "mistral-large-latest",
-            api_key = "your_mistral_api_key",
-            rate_limits = list(requests_per_minute = 2)
-          ),
-          openrouter = list(
-            model = "enter your model",
-            api_key = "your_open_router_api_key",
-            rate_limits = list(requests_per_minute = 2)
-          )
-        )
+    # Debug prints
+    message("Attempting to save Gemini settings...")
+    message("Config file exists: ", file.exists(get_config_path()))
+    message("Config file permissions: ")
+    print(file.info(get_config_path()))
+    
+    tryCatch({
+      # Check if we can read the current config
+      current_config <- read_config()
+      message("Successfully read current config")
+      
+      # Store original values for comparison
+      original_values <- list(
+        api_key = current_config$api$gemini$api_key,
+        model = current_config$api$gemini$model,
+        rpm = current_config$api$gemini$rate_limits$requests_per_minute,
+        rpd = current_config$api$gemini$rate_limits$requests_per_day
       )
-    }
-    
-    # Update the specific values
-    current_config$api$gemini$api_key <- input$apiKey
-    current_config$api$gemini$model <- input$modelSelect
-    current_config$api$gemini$rate_limits$requests_per_minute <- input$requestsPerMinute
-    current_config$api$gemini$rate_limits$requests_per_day <- input$requestsPerDay
-    
-    # Write the updated config
-    yaml::write_yaml(current_config, config_path)
-    
-    showNotification("API Settings saved successfully", type = "message")
+      
+      # Validate input values
+      if (is.null(input$apiKey) || input$apiKey == "") {
+        showNotification("API key cannot be empty", type = "error")
+        return()
+      }
+      
+      if (is.null(input$modelSelect) || input$modelSelect == "") {
+        showNotification("Model must be selected", type = "error")
+        return()
+      }
+      
+      # Validate rate limits are positive numbers
+      if (!is.numeric(input$requestsPerMinute) || input$requestsPerMinute <= 0) {
+        showNotification("Requests per minute must be a positive number", type = "error")
+        return()
+      }
+      
+      if (!is.numeric(input$requestsPerDay) || input$requestsPerDay <= 0) {
+        showNotification("Requests per day must be a positive number", type = "error")
+        return()
+      }
+      
+      # Update the specific values
+      current_config$api$gemini$api_key <- input$apiKey
+      current_config$api$gemini$model <- input$modelSelect
+      current_config$api$gemini$rate_limits$requests_per_minute <- input$requestsPerMinute
+      current_config$api$gemini$rate_limits$requests_per_day <- input$requestsPerDay
+      
+      message("About to write config...")
+      # Write the updated config using your function
+      write_config(current_config)
+      message("Config written")
+      
+      # Verify the changes
+      updated_config <- read_config()
+      if (identical(updated_config$api$gemini$api_key, input$apiKey) &&
+          identical(updated_config$api$gemini$model, input$modelSelect) &&
+          identical(updated_config$api$gemini$rate_limits$requests_per_minute, input$requestsPerMinute) &&
+          identical(updated_config$api$gemini$rate_limits$requests_per_day, input$requestsPerDay)) {
+        
+        showNotification("Gemini API Settings saved successfully", type = "message")
+        
+        # Print confirmation of changes
+        message("Settings updated successfully:")
+        message("API Key changed from: ", original_values$api_key, " to: ", updated_config$api$gemini$api_key)
+        message("Model changed from: ", original_values$model, " to: ", updated_config$api$gemini$model)
+        message("Requests per minute changed from: ", original_values$rpm, " to: ", 
+                updated_config$api$gemini$rate_limits$requests_per_minute)
+        message("Requests per day changed from: ", original_values$rpd, " to: ", 
+                updated_config$api$gemini$rate_limits$requests_per_day)
+        
+      } else {
+        showNotification(
+          "Settings may not have saved correctly. Please verify.", 
+          type = "warning"
+        )
+        
+        # Print what didn't match
+        message("Verification failed:")
+        message("Expected API key: ", input$apiKey)
+        message("Actual API key: ", updated_config$api$gemini$api_key)
+        message("Expected model: ", input$modelSelect)
+        message("Actual model: ", updated_config$api$gemini$model)
+        message("Expected requests per minute: ", input$requestsPerMinute)
+        message("Actual requests per minute: ", updated_config$api$gemini$rate_limits$requests_per_minute)
+        message("Expected requests per day: ", input$requestsPerDay)
+        message("Actual requests per day: ", updated_config$api$gemini$rate_limits$requests_per_day)
+      }
+      
+    }, error = function(e) {
+      showNotification(
+        paste("Error saving config:", e$message), 
+        type = "error"
+      )
+      message("Error details: ", e$message)
+    })
   })
-  
   #### Gemini calls ----
   analyze_with_gemini <- function(pdf_text, prompts, config, progress_callback = NULL) {
     # Basic validation
@@ -2392,43 +2451,75 @@ If no direct source is found, explain your reasoning.",
   
   ### Mistral Save settings ----
   observeEvent(input$saveSettingsMistral, {
-    # Get the user-specific config path
-    config_path <- get_config_path()
+    # Input validation
+    req(input$apiKeyMistral, input$modelSelectMistral)
     
-    # Read the existing config
-    if(file.exists(config_path)) {
-      current_config <- yaml::read_yaml(config_path)
-    } else {
-      # Default config if file doesn't exist
-      current_config <- list(
-        api = list(
-          gemini = list(
-            model = "gemini-1.5-flash",
-            api_key = "your_gemini_api_key",
-            rate_limits = list(requests_per_minute = 2, requests_per_day = 1500)
-          ),
-          mistral = list(
-            model = "mistral-large-latest",
-            api_key = "your_mistral_api_key",
-            rate_limits = list(requests_per_minute = 2)
-          ),
-          openrouter = list(
-            model = "enter your model",
-            api_key = "your_open_router_api_key",
-            rate_limits = list(requests_per_minute = 2)
-          )
+    # Debug prints
+    message("Attempting to save settings...")
+    message("Config file exists: ", file.exists(get_config_path()))
+    message("Config file permissions: ")
+    print(file.info(get_config_path()))
+    
+    tryCatch({
+      # Check if we can read the current config
+      current_config <- read_config()
+      message("Successfully read current config")
+      
+      # Store original values for comparison
+      original_key <- current_config$api$mistral$api_key
+      original_model <- current_config$api$mistral$model
+      
+      # Validate input values
+      if (is.null(input$apiKeyMistral) || input$apiKeyMistral == "") {
+        showNotification("API key cannot be empty", type = "error")
+        return()
+      }
+      
+      if (is.null(input$modelSelectMistral) || input$modelSelectMistral == "") {
+        showNotification("Model must be selected", type = "error")
+        return()
+      }
+      
+      # Update Mistral-specific values
+      current_config$api$mistral$api_key <- input$apiKeyMistral
+      current_config$api$mistral$model <- input$modelSelectMistral
+      
+      message("About to write config...")
+      # Write the updated config
+      write_config(current_config)
+      message("Config written")
+      
+      # Verify the changes
+      updated_config <- read_config()
+      if (identical(updated_config$api$mistral$api_key, input$apiKeyMistral) &&
+          identical(updated_config$api$mistral$model, input$modelSelectMistral)) {
+        showNotification("Mistral API Settings saved successfully", type = "message")
+        
+        # Print confirmation of changes
+        message("Settings updated successfully:")
+        message("API Key changed from: ", original_key, " to: ", updated_config$api$mistral$api_key)
+        message("Model changed from: ", original_model, " to: ", updated_config$api$mistral$model)
+      } else {
+        showNotification(
+          "Settings may not have saved correctly. Please verify.", 
+          type = "warning"
         )
+        
+        # Print what didn't match
+        message("Verification failed:")
+        message("Expected API key: ", input$apiKeyMistral)
+        message("Actual API key: ", updated_config$api$mistral$api_key)
+        message("Expected model: ", input$modelSelectMistral)
+        message("Actual model: ", updated_config$api$mistral$model)
+      }
+      
+    }, error = function(e) {
+      showNotification(
+        paste("Error saving config:", e$message), 
+        type = "error"
       )
-    }
-    
-    # Update Mistral-specific values
-    current_config$api$mistral$api_key <- input$apiKeyMistral
-    current_config$api$mistral$model <- input$modelSelectMistral
-    
-    # Write the updated config
-    write_config(current_config)
-    
-    showNotification("Mistral API Settings saved successfully", type = "message")
+      message("Error details: ", e$message)
+    })
   })
   
   
@@ -2749,43 +2840,79 @@ IMPORTANT: For EACH prompt, you must provide:
   
   ### OpenRouter Save settings ----
   observeEvent(input$saveSettingsOpenRouter, {
-    # Get the user-specific config path
-    config_path <- get_config_path()
+    # Input validation
+    req(input$apiKeyOpenRouter, input$modelSelectOpenRouter)
     
-    # Read the existing config
-    if(file.exists(config_path)) {
-      current_config <- yaml::read_yaml(config_path)
-    } else {
-      # Default config if file doesn't exist
-      current_config <- list(
-        api = list(
-          gemini = list(
-            model = "gemini-1.5-flash",
-            api_key = "your_gemini_api_key",
-            rate_limits = list(requests_per_minute = 2, requests_per_day = 1500)
-          ),
-          mistral = list(
-            model = "mistral-large-latest",
-            api_key = "your_mistral_api_key",
-            rate_limits = list(requests_per_minute = 2)
-          ),
-          openrouter = list(
-            model = "enter your model",
-            api_key = "your_open_router_api_key",
-            rate_limits = list(requests_per_minute = 2)
-          )
-        )
+    # Debug prints
+    message("Attempting to save OpenRouter settings...")
+    message("Config file exists: ", file.exists(get_config_path()))
+    message("Config file permissions: ")
+    print(file.info(get_config_path()))
+    
+    tryCatch({
+      # Check if we can read the current config
+      current_config <- read_config()
+      message("Successfully read current config")
+      
+      # Store original values for comparison
+      original_values <- list(
+        api_key = current_config$api$openrouter$api_key,
+        model = current_config$api$openrouter$model
       )
-    }
-    
-    # Update OpenRouter-specific values
-    current_config$api$openrouter$api_key <- input$apiKeyOpenRouter
-    current_config$api$openrouter$model <- input$modelSelectOpenRouter
-    
-    # Write the updated config
-    write_config(current_config)
-    
-    showNotification("OpenRouter API Settings saved successfully", type = "message")
+      
+      # Validate input values
+      if (is.null(input$apiKeyOpenRouter) || input$apiKeyOpenRouter == "") {
+        showNotification("OpenRouter API key cannot be empty", type = "error")
+        return()
+      }
+      
+      if (is.null(input$modelSelectOpenRouter) || input$modelSelectOpenRouter == "") {
+        showNotification("OpenRouter model must be selected", type = "error")
+        return()
+      }
+      
+      # Update OpenRouter-specific values
+      current_config$api$openrouter$api_key <- input$apiKeyOpenRouter
+      current_config$api$openrouter$model <- input$modelSelectOpenRouter
+      
+      message("About to write config...")
+      # Write the updated config using your function
+      write_config(current_config)
+      message("Config written")
+      
+      # Verify the changes
+      updated_config <- read_config()
+      if (identical(updated_config$api$openrouter$api_key, input$apiKeyOpenRouter) &&
+          identical(updated_config$api$openrouter$model, input$modelSelectOpenRouter)) {
+        
+        showNotification("OpenRouter API Settings saved successfully", type = "message")
+        
+        # Print confirmation of changes
+        message("Settings updated successfully:")
+        message("API Key changed from: ", original_values$api_key, " to: ", updated_config$api$openrouter$api_key)
+        message("Model changed from: ", original_values$model, " to: ", updated_config$api$openrouter$model)
+        
+      } else {
+        showNotification(
+          "OpenRouter settings may not have saved correctly. Please verify.", 
+          type = "warning"
+        )
+        
+        # Print what didn't match
+        message("Verification failed:")
+        message("Expected API key: ", input$apiKeyOpenRouter)
+        message("Actual API key: ", updated_config$api$openrouter$api_key)
+        message("Expected model: ", input$modelSelectOpenRouter)
+        message("Actual model: ", updated_config$api$openrouter$model)
+      }
+      
+    }, error = function(e) {
+      showNotification(
+        paste("Error saving OpenRouter config:", e$message), 
+        type = "error"
+      )
+      message("Error details: ", e$message)
+    })
   })
 
   

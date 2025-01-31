@@ -3260,21 +3260,20 @@ If no direct source is found, explain your reasoning."
         progress_callback(i, length(prompts))  
       }  
       
-      prompt <- sprintf("Analyze this PDF text and answer ALL of the following prompts:
-
-PDF TEXT:
-%s
-
-PROMPTS:
-%s
-
-IMPORTANT: For EACH prompt, you must respond in this format:
-- PROMPT: [original prompt]
-- ANSWER: [comprehensive answer]
-- SOURCE: [exact supporting text from PDF, if no direct text, explain reasoning]
-- PAGE: [page number where source appears]",  
-                        pdf_text,  
-                        prompts[i])  
+      prompt <- sprintf("Analyze this PDF text and answer ALL of the following prompts:  
+  
+PDF TEXT:  
+%s  
+  
+PROMPTS:  
+%s  
+  
+Please respond in exactly this format:  
+ANSWER: [your comprehensive answer]  
+SOURCE: [exact supporting text from PDF, if no direct text, explain reasoning]  
+PAGE: [page number where source appears]",    
+                        pdf_text,    
+                        prompts[i])
       
       # Create request body with context_window
       request_body <- list(
@@ -3313,35 +3312,28 @@ IMPORTANT: For EACH prompt, you must respond in this format:
         result <- jsonlite::fromJSON(httr::content(response, "text", encoding = "UTF-8"))
         answer_text <- result$response
         
-        # Parse the response to extract answer, source, and page  
-        source_match <- regexpr("SOURCE:\\s*([^\\n]+)", answer_text)  
-        page_match <- regexpr("PAGE:\\s*([^\\n]+)", answer_text)  
+        # Parse the response to extract answer, source, and page
+        answer_text <- result$response
         
-        answer <- if (source_match > 0) {  
-          substr(answer_text, 1, source_match - 1)  
-        } else {  
-          answer_text  
-        }  
+        # Split the response into sections
+        sections <- strsplit(answer_text, "PROMPT:|ANSWER:|SOURCE:|PAGE:", perl = TRUE)[[1]]
+        sections <- trimws(sections)
         
-        source <- if (source_match > 0) {  
-          source_text <- regmatches(answer_text, source_match)  
-          gsub("SOURCE:\\s*", "", source_text)  
-        } else {  
-          "Source not specified"  
-        }  
+        # Remove empty sections
+        sections <- sections[sections != ""]
         
-        page <- if (page_match > 0) {  
-          page_text <- regmatches(answer_text, page_match)  
-          gsub("PAGE:\\s*", "", page_text)  
-        } else {  
-          "N/A"  
-        }  
+        # Extract the answer (should be the first meaningful section after "ANSWER:")
+        answer <- sections[2]  # The answer should be the second section
         
-        list(  
-          answer = trimws(answer),  
-          source = trimws(source),  
-          page = trimws(page)  
-        )  
+        # Extract source and page if they exist
+        source <- if (length(sections) >= 3) sections[3] else "Source not specified"
+        page <- if (length(sections) >= 4) sections[4] else "N/A"
+        
+        list(
+          answer = trimws(answer),
+          source = trimws(source),
+          page = trimws(page)
+        )
         
       }, error = function(e) {  
         print("Error details:")

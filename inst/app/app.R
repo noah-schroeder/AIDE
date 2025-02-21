@@ -385,7 +385,7 @@ ui <- dashboardPage(title= "AI-Assisted Data Extraction",
                     ),
                     # Model selection
                     selectInput("modelSelect", "Model",
-                                choices = c("gemini-1.5-flash", "gemini-1.5-pro"),
+                                choices = c("gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"),
                                 selected = tryCatch({
                                   fresh_config <- read_config()
                                   fresh_config$api$gemini$model

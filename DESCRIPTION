@@ -17,6 +17,12 @@ Imports:
     shinydashboard,
     shinyjs,
     utils,
+    ollamar,
+    DT,
+    waiter,
+    readxl,
+    writexl,
+    yaml,
     ollamar
 Depends: 
     tidyverse

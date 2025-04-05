@@ -1004,8 +1004,12 @@ server <- function(input, output, session) {
     
     # Validate the API key using a simple test request
     tryCatch({
+      #construct the URL depending on user-selected model
+      geminimodel <- input$modelSelect
+      geminiurl <- paste0("https://generativelanguage.googleapis.com/v1beta/models/", geminimodel, ":generateContent")
+      
       response <- httr::POST(
-        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent",
+        url = geminiurl,
         httr::add_headers(
           "Content-Type" = "application/json"
         ),

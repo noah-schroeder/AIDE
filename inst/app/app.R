@@ -377,21 +377,13 @@ ui <- dashboardPage(title= "AI-Assisted Data Extraction",
                                 width = "400px"),
                       tags$div(
                         style = "margin-top: 25px;",  # Adjust this value to align perfectly
-                        actionButton("validateKey", 
-                                     label = "Validate Key",
-                                     icon = icon("check"),
-                                     class = "validate-btn")
                       )
                     ),
                     # Model selection
-                    selectInput("modelSelect", "Model",
-                                choices = c("gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"),
-                                selected = tryCatch({
-                                  fresh_config <- read_config()
-                                  fresh_config$api$gemini$model
-                                }, error = function(e) {
-                                  "gemini-1.5-pro"
-                                }),
+                    actionButton("fetchModels", "Fetch Models"),
+                    selectInput("modelSelect", "Select a Model",
+                                choices = character(0),
+                                selected = NULL,
                                 width = "400px"),
                    # Rate limits
                     div(
@@ -985,100 +977,7 @@ server <- function(input, output, session) {
   
   #Gemini ----
   ### Google API key validation ----
-  observeEvent(input$validateKey, {
-    req(input$apiKey)
-    
-    # Update button to loading state
-    validationStatus("loading")
-    updateActionButton(session, "validateKey",
-                       label = "Validating...",
-                       icon = icon("spinner", class = "fa-spin"))
-    
-    # Show loading notification
-    id <- showNotification(
-      "Validating API key...", 
-      type = "default",  # Changed from "message" to "default"
-      duration = NULL,
-      closeButton = FALSE
-    )
-    
-    # Validate the API key using a simple test request
-    tryCatch({
-      #construct the URL depending on user-selected model
-      geminimodel <- input$modelSelect
-      geminiurl <- paste0("https://generativelanguage.googleapis.com/v1beta/models/", geminimodel, ":generateContent")
-      
-      response <- httr::POST(
-        url = geminiurl,
-        httr::add_headers(
-          "Content-Type" = "application/json"
-        ),
-        query = list(
-          key = input$apiKey
-        ),
-        body = jsonlite::toJSON(list(
-          contents = list(
-            list(
-              parts = list(
-                list(text = "Test")
-              )
-            )
-          )
-        ), auto_unbox = TRUE)
-      )
-      
-      # Check response
-      if (httr::status_code(response) == 200) {
-        removeNotification(id)
-        validationStatus("success")
-        updateActionButton(session, "validateKey",
-                           label = "",
-                           icon = icon("check"))
-        runjs("$('#validateKey').addClass('validate-btn-success');")
-        showNotification(
-          "API key is valid!", 
-          type = "default",  # Changed from "success" to "default"
-          duration = 5
-        )
-      } else {
-        removeNotification(id)
-        validationStatus("failed")
-        updateActionButton(session, "validateKey",
-                           label = "Validate Key",
-                           icon = icon("check"))
-        runjs("$('#validateKey').removeClass('validate-btn-success');")
-        showNotification(
-          "Invalid API key. Please check and try again.", 
-          type = "error",
-          duration = 5
-        )
-      }
-    }, error = function(e) {
-      removeNotification(id)
-      validationStatus("failed")
-      updateActionButton(session, "validateKey",
-                         label = "Validate Key",
-                         icon = icon("check"))
-      runjs("$('#validateKey').removeClass('validate-btn-success');")
-      
-      # More detailed error handling
-      error_message <- if(grepl("Could not resolve host", e$message)) {
-        "Network error: Please check your internet connection"
-      } else if(grepl("timed out", e$message)) {
-        "Request timed out: Please try again"
-      } else {
-        "Error validating API key. Please try again"
-      }
-      
-      showNotification(
-        error_message,
-        type = "error",
-        duration = 5
-      )
-    })
-  })
-  
-  ### Gemini observer to reset button state when API key changes ----
+    ### Gemini observer to reset button state when API key changes ----
   observeEvent(input$apiKey, {
     if(validationStatus() != "pending") {
       validationStatus("pending")
@@ -1101,10 +1000,72 @@ server <- function(input, output, session) {
     }
   })
   
+  ### Gemini Fetch Current Model List----
+  observeEvent(input$fetchModels, {
+    api_key <- input$apiKey
+    if (is.null(api_key) || api_key == "") {
+      showModal(modalDialog(
+        title = "Error",
+        "Please enter an API key.",
+        easyClose = TRUE,
+        footer = NULL
+      ))
+      return()
+    }
+    
+    # Make API call to fetch models
+    url <- "https://generativelanguage.googleapis.com/v1beta/models"
+    
+    # Construct the request URL with the API key as a query parameter
+    request_url <- paste0(url, "?key=", api_key)
+    
+    response <- GET(request_url)
+    
+    # Debugging: Print the response and status code
+    cat("Status Code:", status_code(response), "\n")
+    cat("Response Content:", content(response, as = "text", encoding = "UTF-8"), "\n")
+    
+    if (status_code(response) == 200) {
+      content <- content(response, as = "text", encoding = "UTF-8")
+      models_data <- fromJSON(content)
+      
+      # Check if 'models' exists and extract the display names for the selectInput
+      if (!is.null(models_data$models)) {
+        model_choices <- setNames(models_data$models$name, models_data$models$displayName)
+        updateSelectInput(session, "modelSelect", choices = model_choices)
+      } else {
+        showModal(modalDialog(
+          title = "Warning",
+          "No models found in the API response.",
+          easyClose = TRUE,
+          footer = NULL
+        ))
+        # Optionally clear the modelSelect input
+        updateSelectInput(session, "modelSelect", choices = character(0))
+      }
+    } else {
+      showModal(modalDialog(
+        title = "Error",
+        paste("Failed to fetch models. Status code:", status_code(response)),
+        easyClose = TRUE,
+        footer = NULL
+      ))
+      # Optionally clear the modelSelect input on error
+      updateSelectInput(session, "modelSelect", choices = character(0))
+    }
+  })
+  
+  output$selectedModel <- renderText({
+    paste("Selected Model:", input$modelSelect)
+  })
+
+  
+  
+  
   ### Gemini Save settings ----
   observeEvent(input$saveSettings, {
     # Input validation
-    req(input$apiKey, input$modelSelect, 
+    req(input$apiKey, input$modelSelect,
         input$requestsPerMinute, input$requestsPerDay)
     
     # Debug prints
@@ -1148,9 +1109,12 @@ server <- function(input, output, session) {
         return()
       }
       
+      # Extract just the model name by removing the "models/" prefix
+      selected_model_name <- sub("models/", "", input$modelSelect)
+      
       # Update the specific values
       current_config$api$gemini$api_key <- input$apiKey
-      current_config$api$gemini$model <- input$modelSelect
+      current_config$api$gemini$model <- selected_model_name # Use the extracted name
       current_config$api$gemini$rate_limits$requests_per_minute <- input$requestsPerMinute
       current_config$api$gemini$rate_limits$requests_per_day <- input$requestsPerDay
       
@@ -1162,7 +1126,7 @@ server <- function(input, output, session) {
       # Verify the changes
       updated_config <- read_config()
       if (identical(updated_config$api$gemini$api_key, input$apiKey) &&
-          identical(updated_config$api$gemini$model, input$modelSelect) &&
+          identical(updated_config$api$gemini$model, selected_model_name) && # Compare with the extracted name
           identical(updated_config$api$gemini$rate_limits$requests_per_minute, input$requestsPerMinute) &&
           identical(updated_config$api$gemini$rate_limits$requests_per_day, input$requestsPerDay)) {
         
@@ -1172,14 +1136,14 @@ server <- function(input, output, session) {
         message("Settings updated successfully:")
         message("API Key changed from: ", original_values$api_key, " to: ", updated_config$api$gemini$api_key)
         message("Model changed from: ", original_values$model, " to: ", updated_config$api$gemini$model)
-        message("Requests per minute changed from: ", original_values$rpm, " to: ", 
+        message("Requests per minute changed from: ", original_values$rpm, " to: ",
                 updated_config$api$gemini$rate_limits$requests_per_minute)
-        message("Requests per day changed from: ", original_values$rpd, " to: ", 
+        message("Requests per day changed from: ", original_values$rpd, " to: ",
                 updated_config$api$gemini$rate_limits$requests_per_day)
         
       } else {
         showNotification(
-          "Settings may not have saved correctly. Please verify.", 
+          "Settings may not have saved correctly. Please verify.",
           type = "warning"
         )
         
@@ -1187,7 +1151,7 @@ server <- function(input, output, session) {
         message("Verification failed:")
         message("Expected API key: ", input$apiKey)
         message("Actual API key: ", updated_config$api$gemini$api_key)
-        message("Expected model: ", input$modelSelect)
+        message("Expected model: ", selected_model_name) # Compare with the extracted name
         message("Actual model: ", updated_config$api$gemini$model)
         message("Expected requests per minute: ", input$requestsPerMinute)
         message("Actual requests per minute: ", updated_config$api$gemini$rate_limits$requests_per_minute)
@@ -1197,72 +1161,60 @@ server <- function(input, output, session) {
       
     }, error = function(e) {
       showNotification(
-        paste("Error saving config:", e$message), 
+        paste("Error saving config:", e$message),
         type = "error"
       )
       message("Error details: ", e$message)
     })
   })
+  
   #### Gemini calls ----
-  analyze_with_gemini <- function(pdf_text, prompts, config, progress_callback = NULL) {
+  analyze_with_gemini <- function(pdf_path, prompts, config, progress_callback = NULL) {
     # Basic validation
-    if (is.null(pdf_text) || length(pdf_text) == 0) {
-      stop("PDF text is empty or null")
+    if (is.null(pdf_path) || !file.exists(pdf_path)) {
+      stop("PDF path is invalid or file does not exist")
     }
     if (is.null(prompts) || length(prompts) == 0) {
       stop("Prompts are empty or null")
     }
-    
     print("Starting Gemini analysis")
     print(paste("Number of prompts:", length(prompts)))
-    print(paste("PDF text length:", length(pdf_text)))
-    
+    print(paste("PDF path:", pdf_path))
     # Configuration extraction
     base_url <- config$api$gemini$base_url
+    print(paste("Current base_url:", base_url))
     model <- config$api$gemini$model
+    print(paste("Model name from config in analyze:", model))
     api_key <- config$api$gemini$api_key
-    
     if (is.null(base_url) || is.null(model) || is.null(api_key)) {
       stop("Missing required configuration values")
     }
-    
+    # Correct the URL by prepending "models/" to the model name
     url <- sprintf("%s/models/%s:generateContent", base_url, model)
-    
-    # Ensure full PDF text is captured
-    full_pdf_text <- paste(pdf_text, collapse = "\n")
-    
-    # Debug: Print total PDF text length
-    total_pdf_text_length <- nchar(full_pdf_text)
-    print(paste("Total PDF text length:", total_pdf_text_length, "characters"))
-    
-    # Print out the exact prompts for debugging
-    print("Exact Prompts:")
-    for (i in seq_along(prompts)) {
-      print(paste(i, ":", prompts[i]))
-    }
-    
-    # Construct payload
+    # Read the PDF file as base64 encoded data
+    pdf_bytes <- readBin(pdf_path, "raw", n = file.info(pdf_path)$size)
+    pdf_base64 <- base64enc::base64encode(pdf_bytes)
+    # Construct payload for PDF input
     payload <- list(
       contents = list(
         list(
           parts = list(
             list(
+              inline_data = list(
+                mimeType = "application/pdf",
+                data = pdf_base64
+              )
+            ),
+            list(
               text = sprintf("Analyze this PDF and answer ALL of the following prompts. For EACH prompt, you MUST provide:
-
 PROMPT FORMAT:
 ### PROMPT: [original prompt]
 **ANSWER:** [comprehensive answer]
 **SOURCE:** [exact supporting text from PDF, if applicable]
 **PAGE:** [page number where source appears]
-
 If no direct source is found, explain your reasoning.
-
-PDF TEXT:
-%s
-
 PROMPTS:
 %s",
-                             full_pdf_text,
                              paste(sapply(prompts, function(p) paste("- ", p)), collapse = "\n"))
             )
           )
@@ -1275,170 +1227,120 @@ PROMPTS:
         maxOutputTokens = 8192
       )
     )
-    
+    # --- Debugging: Print the JSON Payload ---
+    payload_json <- jsonlite::toJSON(payload, auto_unbox = TRUE, pretty = TRUE)
+    print("--- Request Payload (Sending PDF Directly) ---")
+    cat(payload_json, "\n")
+    print("-------------------------------------------")
+    # --- End Debugging ---
     # Comprehensive API call with error handling
     result <- tryCatch({
-      # Perform API request
-      response <- httr::POST(
-        url = paste0(url, "?key=", api_key),
-        body = jsonlite::toJSON(payload, auto_unbox = TRUE),
-        httr::add_headers("Content-Type" = "application/json"),
-        encode = "json"
-      )
-      
-      # Parse response content
-      content <- httr::content(response, "text")
-      parsed <- jsonlite::fromJSON(content)
-      
+      # Perform API request using httr2 for more robust handling
+      req <- httr2::request(url) %>%
+        httr2::req_method("POST") %>%
+        httr2::req_headers(
+          "Content-Type" = "application/json",
+          "x-goog-api-key" = api_key
+        ) %>%
+        httr2::req_body_json(payload) %>%
+        httr2::req_timeout(300)  # 5-minute timeout
+      # Perform the request with error tracking
+      resp <- httr2::req_perform(req)
+      # Parse response
+      response_content <- httr2::resp_body_json(resp)
       # Extract response text
-      if (!is.null(parsed$candidates) && 
-          length(parsed$candidates) > 0 && 
-          !is.null(parsed$candidates$content$parts[[1]]$text)) {
-        
-        response_text <- parsed$candidates$content$parts[[1]]$text
-        print("Response received successfully")
-        print("Full response text:")
-        print(response_text)
-        
-        # Process responses
-        responses <- lapply(seq_along(prompts), function(i) {
-          # Call progress callback if provided
-          if (!is.null(progress_callback)) {
-            progress_callback(i, length(prompts))
+      response_text <- response_content$candidates[[1]]$content$parts[[1]]$text
+      # Debug print
+      print("Response received successfully")
+      print("Full response text:")
+      print(response_text)
+      # Process responses with improved parsing
+      responses <- lapply(seq_along(prompts), function(i) {
+        # Call progress callback if provided
+        if (!is.null(progress_callback)) {
+          progress_callback(i, length(prompts))
+        }
+        # Improved parsing logic
+        prompt <- prompts[i]
+        # Print debug information for each prompt
+        print(paste("Processing prompt", i, ":", prompt))
+        # Split the response text into sections
+        response_sections <- strsplit(response_text, "### PROMPT: ")[[1]]
+        # Skip the first element (which is empty or contains text before first prompt)
+        response_sections <- response_sections[-1]
+        # Find the matching section
+        matching_section <- NULL
+        for (section in response_sections) {
+          # Check if the section starts with the current prompt
+          if (startsWith(section, prompt)) {
+            matching_section <- section
+            break
           }
-          
-          # Get current prompt
-          prompt <- prompts[i]
-          
-          # Print debug information
-          print(paste("Processing prompt", i, ":", prompt))
-          
-          # Split the response text into sections
-          response_sections <- strsplit(response_text, "### PROMPT: ")[[1]]
-          response_sections <- response_sections[-1] # Remove text before first prompt
-          
-          # Find matching section
-          matching_section <- NULL
-          for (section in response_sections) {
-            if (startsWith(section, prompt)) {
-              matching_section <- section
-              break
-            }
-          }
-          
-          if (!is.null(matching_section)) {
-            print("Matched prompt section:")
-            print(matching_section)
-            
-            # Position-based extraction
-            answer_start <- regexpr("\\*\\*ANSWER:\\*\\*", matching_section)
-            source_start <- regexpr("\\*\\*SOURCE:\\*\\*", matching_section)
+        }
+        if (!is.null(matching_section)) {
+          print("Matched prompt section:")
+          print(matching_section)
+          # Manual parsing of answer, source, and page
+          # Extract answer
+          answer_start <- regexpr("\\*\\*ANSWER:\\*\\*", matching_section)
+          source_start <- regexpr("\\*\\*SOURCE:\\*\\*", matching_section)
+          page_start <- regexpr("\\*\\*PAGE:\\*\\*", matching_section)
+          answer <- if (answer_start > 0) {
+            end_pos <- if (source_start > 0) source_start else
+              if (page_start > 0) page_start else nchar(matching_section)
+            trimws(substr(matching_section,
+                          answer_start + attr(regexpr("\\*\\*ANSWER:\\*\\*", matching_section), "match.length"),
+                          end_pos - 1))
+          } else "No answer found"
+          # Extract source
+          source <- if (source_start > 0) {
             page_start <- regexpr("\\*\\*PAGE:\\*\\*", matching_section)
-            
-            # Extract answer
-            answer <- if (answer_start > 0) {
-              end_pos <- if (source_start > 0) source_start else 
-                if (page_start > 0) page_start else nchar(matching_section)
-              trimws(substr(matching_section, 
-                            answer_start + attr(regexpr("\\*\\*ANSWER:\\*\\*", matching_section), "match.length"),
-                            end_pos - 1))
-            } else "No answer found"
-            
-            # Extract source and page
-            source <- if (source_start > 0) {
-              end_pos <- if (page_start > 0) page_start else nchar(matching_section)
-              source_text <- trimws(substr(matching_section, 
-                                           source_start + attr(regexpr("\\*\\*SOURCE:\\*\\*", matching_section), "match.length"),
-                                           end_pos - 1))
-              # Ensure source is returned even if empty
-              if (source_text == "") "No specific source provided" else source_text
-            } else "No source information available"
-            
-            # Extract page
-            page <- if (page_start > 0) {
-              page_text <- trimws(substr(matching_section, 
-                                         page_start + attr(regexpr("\\*\\*PAGE:\\*\\*", matching_section), "match.length"),
-                                         nchar(matching_section)))
-              # Extract the number from the source text if page is not explicitly provided
-              if (page_text == "" || page_text == "N/A") {
-                # Look for page numbers in the source text
-                page_match <- regexpr("page\\s+\\d+", source, ignore.case = TRUE)
-                if (page_match > 0) {
-                  page_num <- gsub("page\\s+", "", tolower(substr(source, page_match, 
-                                                                  page_match + attr(page_match, "match.length") - 1)))
-                  page_num
-                } else {
-                  "N/A"
-                }
-              } else {
-                page_text
-              }
-            } else {
-              # Try to extract page number from source if no explicit page marker
-              if (!is.null(source)) {
-                page_match <- regexpr("page\\s+\\d+", source, ignore.case = TRUE)
-                if (page_match > 0) {
-                  page_num <- gsub("page\\s+", "", tolower(substr(source, page_match, 
-                                                                  page_match + attr(page_match, "match.length") - 1)))
-                  page_num
-                } else {
-                  "N/A"
-                }
-              } else {
-                "N/A"
-              }
-            }
-            
-            # Return the result ensuring source is never NULL
-            return(list(
-              answer = answer,
-              source = if(is.null(source)) "No source information available" else source,
-              page = page
-            ))
-            
-            return(list(
-              answer = answer,
-              source = source,
-              page = page
-            ))
-            
-          } else {
-            print(paste("No section found for prompt:", prompt))
-            print("Debugging details:")
-            print("Available sections:")
-            for (j in seq_along(response_sections)) {
-              print(paste(j, ":", substr(response_sections[j], 1, 100)))
-            }
-            
-            return(list(
-              answer = "No response found for this prompt",
-              source = NULL,
-              page = NULL
-            ))
+            end_pos <- if (page_start > 0) page_start else nchar(matching_section)
+            trimws(substr(matching_section,
+                          source_start + attr(regexpr("\\*\\*SOURCE:\\*\\*", matching_section), "match.length"),
+                          end_pos - 1))
+          } else NULL
+          # Extract page
+          page <- if (page_start > 0) {
+            trimws(substr(matching_section,
+                          page_start + attr(regexpr("\\*\\*PAGE:\\*\\*", matching_section), "match.length"),
+                          nchar(matching_section)))
+          } else "N/A"
+          return(list(
+            answer = answer,
+            source = source,
+            page = page
+          ))
+        } else {
+          print(paste("No section found for prompt:", prompt))
+          print("Debugging details:")
+          print("Available sections:")
+          for (j in seq_along(response_sections)) {
+            print(paste(j, ":", substr(response_sections[j], 1, 100)))
           }
-        })
-        
-        return(responses)
-        
-      } else {
-        stop("No valid response from Gemini API")
-      }
+          return(list(
+            answer = "No response found for this prompt",
+            source = NULL,
+            page = NULL
+          ))
+        }
+      })
+      return(responses)
     }, error = function(e) {
-      # Error handling
+      # Comprehensive error handling
       print("Critical error in Gemini API call:")
       print(e$message)
-      
+      # Return placeholder responses
       return(lapply(prompts, function(x) list(
         answer = paste("API Error:", e$message),
         source = NULL,
         page = NULL
       )))
     })
-    
     return(result)
   }
   
-  # Null coalescing operator
+  # Null coalescing operator (moved outside the function definition for clarity)
   `%||%` <- function(x, y) if (is.null(x) || is.na(x)) y else x
   
   
@@ -1463,16 +1365,13 @@ PROMPTS:
     rv$sources <- list()
     rv$pages <- list()
     
-    # Explicit validation with safer checks
-    if (is.null(rv$pdf_text)) {
-      showNotification("PDF text is NULL. Please upload a PDF first.", type = "warning")
+    # Explicit validation with safer checks for PDF upload
+    if (is.null(input$pdfFile)) {
+      showNotification("Please upload a PDF file first.", type = "warning")
       return()
     }
     
-    if (length(rv$pdf_text) == 0) {
-      showNotification("PDF text is empty. Please upload a valid PDF.", type = "warning")
-      return()
-    }
+    pdf_path <- input$pdfFile$datapath
     
     if (is.null(rv$prompts)) {
       showNotification("Prompts are NULL. Please upload a coding form first.", type = "warning")
@@ -1483,6 +1382,71 @@ PROMPTS:
       showNotification("No prompts found. Please upload a valid coding form.", type = "warning")
       return()
     }
+    
+    # Create and show a modal dialog with progress
+    showModal(modalDialog(
+      title = NULL,
+      footer = NULL,
+      size = "s",
+      easyClose = FALSE,
+      div(
+        style = "text-align: center; padding: 20px;",
+        h4("Analyzing PDF..."),
+        div(
+          style = "width: 100%; padding: 10px;",
+          div(class = "progress",
+              div(
+                class = "progress-bar",
+                role = "progressbar",
+                style = "width: 50%"
+              )
+          ),
+          div(id = "progress-detail", "Sending API Request. This usually takes less than 2 minutes. The progress bar above will not move until the response is received."),
+          div(
+            id = "time-estimate",
+            style = "margin-top: 10px; font-size: 0.9em; color: #666;",
+            "Please be patient..."
+          )
+        )
+      )
+    ))
+    
+    # Wrap the entire analysis process in tryCatch
+    tryCatch({
+      print("Starting analysis...")
+      
+      total_prompts <- length(rv$prompts)
+      
+      responses <- if (input$llmMethod == "Local Models with Ollama") {
+        analysis_function(
+          pdf_text = rv$pdf_text, # Keep this for Ollama if it still uses text
+          prompts = rv$prompts,
+          selected_model = input$selectedOllamaModel,
+          context_window = input$contextWindow,
+          progress_callback = function(current, total) {
+            # Update progress bar
+            progress_pct <- (current/total) * 100
+            runjs(sprintf("
+              $('.progress-bar').css('width', '%s%%');
+              $('#progress-detail').text('Processing prompt %d of %d');
+            ", progress_pct, current, total))
+          }
+        )
+      } else {
+        analysis_function(
+          pdf_path = pdf_path, # Use pdf_path for Gemini and other cloud APIs
+          prompts = rv$prompts,
+          config = config,
+          progress_callback = function(current, total) {
+            # Update progress bar
+            progress_pct <- (current/total) * 100
+            runjs(sprintf("
+              $('.progress-bar').css('width', '%s%%');
+              $('#progress-detail').text('Processing prompt %d of %d');
+            ", progress_pct, current, total))
+          }
+        )
+      }
     
     # Create and show a modal dialog with progress
     showModal(modalDialog(
@@ -1532,6 +1496,16 @@ PROMPTS:
         $('#progress-detail').text('Processing prompt %d of %d');  
       ", progress_pct, current, total))  
           }  
+        )
+      } else if (input$llmMethod == "Google Gemini API") {
+        analysis_function(
+          pdf_path = pdf_path, # Use pdf_path for Gemini
+          prompts = rv$prompts,
+          config = config,
+          progress_callback = function(current, total) {
+            progress_pct <- (current/total) * 100
+            runjs(sprintf("$('.progress-bar').css('width', '%s%%'); $('#progress-detail').text('Processing prompt %d of %d');", progress_pct, current, total))
+          }
         )
       } else {
         analysis_function(  
@@ -1735,6 +1709,7 @@ PROMPTS:
         })
       })
     }
+  })
   })
   
   

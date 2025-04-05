@@ -1354,9 +1354,9 @@ PROMPTS:
     print("Prompts status:")
     print(str(rv$prompts))
     
-    # Choose the appropriate analysis function based on selected LLM  
-    analysis_function <- switch(input$llmMethod,  
-                                "Google Gemini API" = analyze_with_gemini,  
+    # Choose the appropriate analysis function based on selected LLM
+    analysis_function <- switch(input$llmMethod,
+                                "Google Gemini API" = analyze_with_gemini,
                                 "Mistral API" = analyze_with_mistral,
                                 "OpenRouter API" = analyze_with_openrouter,
                                 "Local Models with Ollama" = analyze_with_ollama)
@@ -1370,14 +1370,12 @@ PROMPTS:
       showNotification("Please upload a PDF file first.", type = "warning")
       return()
     }
-    
     pdf_path <- input$pdfFile$datapath
     
     if (is.null(rv$prompts)) {
       showNotification("Prompts are NULL. Please upload a coding form first.", type = "warning")
       return()
     }
-    
     if (length(rv$prompts) == 0) {
       showNotification("No prompts found. Please upload a valid coding form.", type = "warning")
       return()
@@ -1414,9 +1412,7 @@ PROMPTS:
     # Wrap the entire analysis process in tryCatch
     tryCatch({
       print("Starting analysis...")
-      
       total_prompts <- length(rv$prompts)
-      
       responses <- if (input$llmMethod == "Local Models with Ollama") {
         analysis_function(
           pdf_text = rv$pdf_text, # Keep this for Ollama if it still uses text
@@ -1427,99 +1423,38 @@ PROMPTS:
             # Update progress bar
             progress_pct <- (current/total) * 100
             runjs(sprintf("
-              $('.progress-bar').css('width', '%s%%');
-              $('#progress-detail').text('Processing prompt %d of %d');
-            ", progress_pct, current, total))
+            $('.progress-bar').css('width', '%s%%');
+            $('#progress-detail').text('Processing prompt %d of %d');
+          ", progress_pct, current, total))
           }
         )
-      } else {
+      } else if (input$llmMethod == "Google Gemini API") {
         analysis_function(
-          pdf_path = pdf_path, # Use pdf_path for Gemini and other cloud APIs
+          pdf_path = pdf_path, # Use pdf_path for Gemini and other cloud APIs that allow for PDF
           prompts = rv$prompts,
           config = config,
           progress_callback = function(current, total) {
             # Update progress bar
             progress_pct <- (current/total) * 100
             runjs(sprintf("
-              $('.progress-bar').css('width', '%s%%');
-              $('#progress-detail').text('Processing prompt %d of %d');
-            ", progress_pct, current, total))
-          }
-        )
-      }
-    
-    # Create and show a modal dialog with progress
-    showModal(modalDialog(
-      title = NULL,
-      footer = NULL,
-      size = "s",
-      easyClose = FALSE,
-      div(
-        style = "text-align: center; padding: 20px;",
-        h4("Analyzing PDF..."),
-        div(
-          style = "width: 100%; padding: 10px;",
-          div(class = "progress",
-              div(
-                class = "progress-bar",
-                role = "progressbar",
-                style = "width: 50%"
-              )
-          ),
-          div(id = "progress-detail", "Sending API Request. This usually takes less than 2 minutes. The progress bar above will not move until the response is received."),
-          div(
-            id = "time-estimate",
-            style = "margin-top: 10px; font-size: 0.9em; color: #666;",
-            "Please be patient..."
-          )
-        )
-      )
-    ))
-    
-    # Wrap the entire analysis process in tryCatch
-    tryCatch({
-      print("Starting analysis...")
-      
-      total_prompts <- length(rv$prompts)
-      
-      responses <- if (input$llmMethod == "Local Models with Ollama") {
-        analysis_function(  
-          pdf_text = rv$pdf_text,  
-          prompts = rv$prompts,
-          selected_model = input$selectedOllamaModel,
-          context_window = input$contextWindow,
-          progress_callback = function(current, total) {  
-            # Update progress bar  
-            progress_pct <- (current/total) * 100  
-            runjs(sprintf("  
-        $('.progress-bar').css('width', '%s%%');  
-        $('#progress-detail').text('Processing prompt %d of %d');  
-      ", progress_pct, current, total))  
-          }  
-        )
-      } else if (input$llmMethod == "Google Gemini API") {
-        analysis_function(
-          pdf_path = pdf_path, # Use pdf_path for Gemini
-          prompts = rv$prompts,
-          config = config,
-          progress_callback = function(current, total) {
-            progress_pct <- (current/total) * 100
-            runjs(sprintf("$('.progress-bar').css('width', '%s%%'); $('#progress-detail').text('Processing prompt %d of %d');", progress_pct, current, total))
+            $('.progress-bar').css('width', '%s%%');
+            $('#progress-detail').text('Processing prompt %d of %d');
+          ", progress_pct, current, total))
           }
         )
       } else {
-        analysis_function(  
-          pdf_text = rv$pdf_text,  
-          prompts = rv$prompts,  
-          config = config,  
-          progress_callback = function(current, total) {  
-            # Update progress bar  
-            progress_pct <- (current/total) * 100  
-            runjs(sprintf("  
-        $('.progress-bar').css('width', '%s%%');  
-        $('#progress-detail').text('Processing prompt %d of %d');  
-      ", progress_pct, current, total))  
-          }  
+        analysis_function(
+          pdf_text = rv$pdf_text,
+          prompts = rv$prompts,
+          config = config,
+          progress_callback = function(current, total) {
+            # Update progress bar
+            progress_pct <- (current/total) * 100
+            runjs(sprintf("
+            $('.progress-bar').css('width', '%s%%');
+            $('#progress-detail').text('Processing prompt %d of %d');
+          ", progress_pct, current, total))
+          }
         )
       }
       
@@ -1544,25 +1479,22 @@ PROMPTS:
           if (!is.null(responses[[i]]) && !is.null(responses[[i]]$answer)) {
             print(sprintf("Updating response_%d with:", i))
             print(responses[[i]]$answer)
-            
             # Update text input with answer only
             updateTextAreaInput(
               session,
               inputId = paste0("response_", i),
               value = responses[[i]]$answer
             )
-            
             # Store source and page information
             if (!is.null(responses[[i]]$source) && !is.null(responses[[i]]$page)) {
-              rv$sources[[i]] <- sprintf("SOURCE: %s\nPAGE: %s", 
-                                         responses[[i]]$source, 
+              rv$sources[[i]] <- sprintf("SOURCE: %s\nPAGE: %s",
+                                         responses[[i]]$source,
                                          responses[[i]]$page)
               rv$pages[[i]] <- responses[[i]]$page
             } else {
               rv$sources[[i]] <- "No source information available"
               rv$pages[[i]] <- "N/A"
             }
-            
             print(paste("Stored source for prompt", i, ":", rv$sources[[i]]))
             print(paste("Stored page for prompt", i, ":", rv$pages[[i]]))
           } else {
@@ -1571,7 +1503,6 @@ PROMPTS:
             rv$pages[[i]] <- "N/A"
           }
         }
-        
         # Debug prints for final status
         print("Debug: Final sources status:")
         print(paste("Number of sources:", length(rv$sources)))
@@ -1579,15 +1510,13 @@ PROMPTS:
           print(paste("Source", i, ":", substr(rv$sources[[i]], 1, 100), "..."))
           print(paste("Page", i, ":", rv$pages[[i]]))
         }
-        
         showNotification("Analysis complete!", type = "message")
       } else {
         showNotification("No valid responses received", type = "warning")
       }
-      
     }, error = function(e) {
       print(paste("Error in analyze button observer:", e$message))
-      showNotification("Error during analysis. Please check the console for details.", 
+      showNotification("Error during analysis. Please check the console for details.",
                        type = "warning")
     }, finally = {
       removeModal()  # Remove the modal when done
@@ -1709,7 +1638,6 @@ PROMPTS:
         })
       })
     }
-  })
   })
   
   

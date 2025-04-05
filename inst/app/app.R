@@ -212,6 +212,40 @@ ui <- dashboardPage(title= "AI-Assisted Data Extraction",
     .wrapper {  
       background-color: #f8f9fa !important;  
     }
+    /* Button styles */  
+.btn-primary {  
+  background-color: #007bff;  
+  border-color: #007bff;  
+  color: white;  
+}  
+  
+.btn-primary:hover {  
+  background-color: #0069d9;  
+  border-color: #0062cc;  
+}  
+  
+.btn-secondary {  
+  background-color: #6c757d;  
+  border-color: #6c757d;  
+  color: white;  
+}  
+  
+.btn-secondary:hover {  
+  background-color: #5a6268;  
+  border-color: #545b62;  
+}  
+  
+/* Disabled button style */  
+.btn-secondary:disabled {  
+  background-color: #6c757d;  
+  border-color: #6c757d;  
+  opacity: 0.65;  
+  cursor: not-allowed;  
+}  
+  
+.btn {  
+  transition: background-color 0.3s, border-color 0.3s;  
+}
      "))
     ),
     
@@ -230,7 +264,7 @@ ui <- dashboardPage(title= "AI-Assisted Data Extraction",
                 title = "Welcome to AI-Assisted Data Extraction (AIDE)",
                 div(
                   style = "display: flex; flex-direction: column; gap: 8px;", # Reduced from 15px to 8px
-                  p("AIDE was developed to greatly accelerate the data extraction process for systematic review and meta-analysis. It relies on you either using local models via Ollama or having an API key for Google Gemini, Mistral, or Open Router (which all offer free tiers as of December 2024).",
+                  p("AIDE was developed to greatly accelerate the data extraction process for systematic review and meta-analysis. It relies on you either having an API key for Google Gemini, Mistral, or Open Router (which all offer free tiers as of December 2024) or using local models via Ollama.",
                   ),
                 ),
               ),
@@ -238,38 +272,29 @@ ui <- dashboardPage(title= "AI-Assisted Data Extraction",
                 width = 6,
                 title = "How to Use This App",
                 div(
-                  style = "display: flex; flex-direction: column; gap: 8px;", # Reduc
+                  style = "display: flex; flex-direction: column; gap: 8px;", 
                   strong("LLMs via API"),
-                  p("1) You will need an API key for the LLM provider of your choice (Google Gemini, Mistral, or Open Router). At the time this app was created (December, 2024), all three of the following providers offered free API tiers:", 
+                  p("1) You will need an API key for the LLM provider of your choice (Google Gemini, Mistral, or Open Router). At the time this app was created (December, 2024), all three of the following providers offered free API tiers:"), 
                     HTML("API Key Providers:  
                       <ul>  
                         <li><a href='https://aistudio.google.com/' target='_blank' style='display: inline;'>Google AI Studio</a></li>  
                         <li><a href='https://mistral.ai/' target='_blank' style='display: inline;'>Mistral AI</a></li>  
                         <li><a href='https://openrouter.ai/' target='_blank' style='display: inline;'>Open Router</a></li>  
-                      </ul>")
-                    ),
+                      </ul>"),
                   p("2) Set up your coding form. Importantly, your first row will be read as prompts by the large language model. The accuracy of the LLM's responses will be influenced very strongly by your prompts. Better prompts = better results."),
                   p("3) Move to the LLM Setup tab of this app where you can continue with the following steps:"),
                   p("4) Upload your coding form. Your coding form should be in Excel format for best results."),
-                  p("4) Move to the analyze page and upload the PDF file you want to analyze. You will see a context size estimate - ensure it fits with the model you are using."),
+                  p("4) Move to the analyze page and upload the PDF file you want to analyze."),
                   p("5) Click Analyze button. Your results will autofill under the appropriate prompt."),
                   p("6) Review each response. You can view the source information by clicking the Source button. You can record each result by clicking the record button. This will save it to your coding form on your local machine."),
                   p("7) When ready to work on the next PDF, simply upload a new one and the coding form will reset."),
                   strong("LLMs via Ollama"),
-                  p("1) You will Ollama installed, as well as the LLM model you want to use downloaded to Ollama.", 
-                    HTML("Ollama:  
+                  p("1) You will Ollama installed, as well as the LLM model you want to use downloaded to Ollama. Otherwise the steps are essentially the same."), 
+                    HTML("  
                       <ul>  
                         <li><a href='https://ollama.com/' target='_blank' style='display: inline;'>Ollama</a></li>  
                         <li><a href='https://ollama.com/search' target='_blank' style='display: inline;'>Ollama Models</a></li>  
-                      </ul>")
-                  ),
-                  p("2) Set up your coding form. Importantly, your first row will be read as prompts by the large language model. The accuracy of the LLM's responses will be influenced very strongly by your prompts. Better prompts = better results."),
-                  p("3) Move to the LLM Setup tab of this app where you can continue with the following steps:"),
-                  p("4) Upload your coding form. Your coding form should be in Excel format for best results."),
-                  p("4) Move to the analyze page and upload the PDF file you want to analyze. You will see a context size estimate - ensure it fits with the model you are using. Then set your context window size."),
-                  p("5) Click Analyze button. The speed of the analysis will depend on a) your computer hardware, b) what is being analyzed, c) the context window size. Your results will autofill under the appropriate prompt."),
-                  p("6) Review each response. You can view the source information by clicking the Source button. You can record each result by clicking the record button. This will save it to your coding form on your local machine."),
-                  p("7) When ready to work on the next PDF, simply upload a new one and the coding form will reset."),
+                      </ul>"),
                   ),
               ),
               box(
@@ -277,52 +302,25 @@ ui <- dashboardPage(title= "AI-Assisted Data Extraction",
                 title = "Common Questions",
                 div(
                   style = "display: flex; flex-direction: column; gap: 8px;", # Reduc
-                  strong("How big of a context window do I need?"),
-                  p("We recommend models with a minimum of 32K context window. We have tried to include models that have large (128K+) context windows (Gemini, Mistral Large 2). Every time you upload a PDF, you'll see an estimated context window size. If you are running local models, you will be able to set your context size."),
                   strong("What LLM should I use?"),
-                  p(
+                  p("For many users where strict data privacy/security are not a concern and compute resources are a problem, we recommend using API-based services because they tend to be faster and perform well."),
                   HTML("General Thoughts:  
                       <ul>  
                       <li>We have had excellent results with Google Gemini models. Mistral large also performs very well in our testing.</li>  
                       <li>Running local models with Ollama requires a bit of knowledge and a fair bit of computational resources. This feature is currently in beta because each local model responds differently, so it is challenging for this software parse the response and source information.</li>  
-                      <li>Mistral large performs very well in our testing.</li>  
                       <li>Open Router's free tier tends to offer smaller context windows and consequently, these models have not performed well in our informal testing. For this reason, we suggest using either Gemini or Mistral models as of December 2024.</li>  
                       </ul>")
                     ),
                   p("If you want to use a paid service, like ChatGPT or Claude, they are accessible through Open Router. However, as of December 2024 we have not yet tested if they reply in a way that this app can easily parse."),
-                  strong("What source text is sent to the LLM?"),
-                  p("This app uses the pdftools package for R to extract structured text from the PDF. This means images are not sent to the LLM, and some formatting in the PDF may be lost. This is a necessary trade off because at this point (December 2024) you cannot send PDF files directly to many LLMs, many require text data."),
-                  strong("What system and user prompts do you use?"),
-                  HTML("Prompts used:  
-                      <ul>  
-                        <li>Google Gemini</li> 
-                        <ul>
-                          <li>System prompt: None</li>
-                          <li>User prompt: Analyze this PDF and answer ALL of the following prompts. For EACH prompt, you MUST provide... [continues into answer, source, page labels]</li>
-                        </ul>
-                        <li>Local Models with Ollama</li> 
-                        <ul>
-                          <li>System prompt: None</li>
-                          <li>User prompt: Analyze this PDF and answer ALL of the following prompts. IMPORTANT: For EACH prompt, you must respond in this format:
- [continues into answer, source, page labels]</li>
-                        </ul>
-                        <li>Mistral</li> 
-                        <ul>
-                          <li>System prompt: You are an expert PDF analyzer. You will process multiple prompts about this document.</li>
-                          <li>User prompt: Analyze this PDF text and answer ALL of the following prompts... [continues into answer, source, page labels]  </li>
-                        </ul>
-                        <li>Open Router</li> 
-                        <ul>
-                          <li>System prompt: You are an expert PDF analyzer. You will process multiple prompts about this document.</li>
-                          <li>User prompt: Analyze this PDF text and answer ALL of the following prompts... [continues into answer, source, page labels]  </li>
-                        </ul>
-                      </ul>"),
-                  strong("Is each prompt an API call? How do I know how many times I'm sending a request to the API?"),
+                strong("Why don't you directly support GPT or Claude?"),
+                p("Free options perform very well. Why would you want to pay for similar results?"),  
+                strong("What source text is sent to the LLM?"),
+                  p("This varies by LLM. For Gemini, we send the full PDF to the API - this should increase the accuracy of the data extraction. For all other LLMs, the app uses the pdftools package for R to extract structured text from the PDF. This means images are not sent to the LLM, and some formatting in the PDF may be lost. This is a necessary trade off because at this point (April, 2025) you cannot send PDF files directly to many LLMs, many require text data."),
+                strong("Is each prompt an API call? How do I know how many times I'm sending a request to the API?"),
                   p("Each time you press \"Analyze\" on the analysis page it makes one API request. All prompts and the full text are built into one API request. "),
                   strong("Can I see the direct responses from the API?"),
                   p("A lot of information prints in the R console for debugging purposes."),
                   ),
-              ),
       ),
       #LLM Config ----
          tabItem("LLM",     
@@ -350,7 +348,9 @@ ui <- dashboardPage(title= "AI-Assisted Data Extraction",
                   div(    
                     style = "display: flex; flex-direction: column; gap: 8px;",    
                     p("1) The free tier of the Google Gemini API has rate limits. You can check current rate limits for the free tier here:", HTML('<a href="https://ai.google.dev/pricing" target="_blank" style="display: inline;">Google AI API Pricing.</a>')),
-                    p("2) There are a variety of different models available from Google, such as various versions of Gemini Flash and Gemini Pro. You can find the list of all models here:", HTML('<a href="https://ai.google.dev/gemini-api/docs/models/gemini" target="_blank" style="display: inline;">Google AI Models.</a>'), "Our experience during testing was that Gemini 1.5 Pro slightly outperformed Gemini 1.5 Flash, however 1.5 Flash was still very good!"),    
+                    p("2) There are a variety of different models available from Google, such as various versions of Gemini Flash and Gemini Pro. All will be listed once you fetch them, however not all will work. This app sends the entire PDF to the Gemini API. Our experience during testing was that Gemini Pro slightly outperformed Gemini Flash, however Flash was still very good and it is faster! We use Flash in much of our own work."),    
+                    strong("It won't fetch models, what do I do?"),
+                    p("Check that you've entered the API key correctly without any extra spaces. Check at the end of the key - it is very easy to introduce a space at the end of the key."),
                     )
                 )
               ),
@@ -377,11 +377,16 @@ ui <- dashboardPage(title= "AI-Assisted Data Extraction",
                                 width = "400px"),
                       tags$div(
                         style = "margin-top: 25px;",  # Adjust this value to align perfectly
+                        actionButton("fetchModels", 
+                                     label = "Fetch Models",
+                                     icon = icon("refresh"),
+                                     class = "validate-btn")
                       )
                     ),
                     # Model selection
-                    actionButton("fetchModels", "Fetch Models", icon = icon("refresh")),
-                    selectInput("modelSelect", "Select a Model",
+                    conditionalPanel(  
+                      condition = "input.fetchModels > 0 && typeof output.modelsFetched !== 'undefined' && output.modelsFetched", 
+                    selectInput("modelSelect", "Select a Model - Not all models will work. Gemini Flash and Pro are the recommended models.",
                                 choices = character(0),
                                 selected = NULL,
                                 width = "400px"),
@@ -419,7 +424,8 @@ ui <- dashboardPage(title= "AI-Assisted Data Extraction",
                                    icon = icon("save"),
                                    style = "color: #fff; background-color: #337ab7; border-color: #2e6da4")
                     
-                  ),
+                    ),
+                   ),
                 ),
               ),
               #Mistral selection ----
@@ -431,7 +437,9 @@ ui <- dashboardPage(title= "AI-Assisted Data Extraction",
                   div(    
                     style = "display: flex; flex-direction: column; gap: 8px;",    
                     p("1) Mistral has a very generous experimental/research API at the time this app was created (December, 2024). The full list of models is here:", HTML('<a href="https://docs.mistral.ai/getting-started/models/models_overview/" target="_blank" style="display: inline;">Mistral Models.</a>'), "We have only included models that have a 128K or larger context window."),
-                    p("2) Since we are sending text data only, and at least as of December 2024 Mistral allowed those with free API key usage to use all models, we recommend using Mistral Large as we have had very good results with it."),    
+                    p("2) Since we are sending text data only, and at least as of December 2024 Mistral allowed those with free API key usage to use all models, we recommend using Mistral Large or Mistral Small"),    
+                    strong("It won't fetch models, what do I do?"),
+                    p("Check that you've entered the API key correctly without any extra spaces. Check at the end of the key - it is very easy to introduce a space at the end of the key."),
                     )
                 )
               ),
@@ -456,28 +464,29 @@ ui <- dashboardPage(title= "AI-Assisted Data Extraction",
                                 width = "400px"),
                       tags$div(
                         style = "margin-top: 25px;",  # Adjust this value to align perfectly
-                        actionButton("validateKeyMistral", 
-                                     label = "Validate Key",
-                                     icon = icon("check"),
+                        actionButton("fetchModelsMistral", 
+                                     label = "Fetch Models",
+                                     icon = icon("refresh"),
                                      class = "validate-btn")
                       )
                     ),
-                    # Model selection
-                    actionButton("fetchModelsMistral", "Fetch Models", icon = icon("refresh")),
-                    selectInput("modelSelectMistral", "Select a Model",
-                                choices = character(0),
-                                selected = NULL,
-                                width = "400px"),
-          
-                    # Save Settings Button    
-                    uiOutput("containerStatus"),  
-                    p("You must click save settings before you can use this model."),
-                    actionButton("saveSettingsMistral", "Save Settings",     
-                                 icon = icon("save"),    
-                                 style = "color: #fff; background-color: #337ab7; border-color: #2e6da4")    
-                  )    
-                )    
-              ),   
+                    # Model selection - with conditional panel  
+                    conditionalPanel(    
+                      condition = "input.fetchModelsMistral > 0 && typeof output.modelsFetchedMistral !== 'undefined' && output.modelsFetchedMistral",   
+                      selectInput("modelSelectMistral", "Select a Model",  
+                                  choices = character(0),  
+                                  selected = NULL,  
+                                  width = "400px"),  
+                      # Save Settings Button      
+                      uiOutput("containerStatus"),    
+                      p("You must click save settings before you can use this model."),  
+                      actionButton("saveSettingsMistral", "Save Settings",       
+                                   icon = icon("save"),      
+                                   style = "color: #fff; background-color: #337ab7; border-color: #2e6da4")  
+                    )  
+                  )      
+                )      
+              ),
               
               # Open Router Selection ----
               conditionalPanel(    
@@ -755,6 +764,7 @@ server <- function(input, output, session) {
     is_processing = FALSE,
     selected_ollama_model = NULL
   )
+  
   mistral_key_valid <- reactiveVal(FALSE)
   current_row <- reactiveVal(NULL)
   validationStatus <- reactiveVal("pending") # Can be "pending", "success", or "failed"
@@ -962,7 +972,7 @@ server <- function(input, output, session) {
         div(
           class = "coding-buttons",
           actionButton(inputId = paste0("source_", i), label = "Source", class = "btn-info"),
-          actionButton(inputId = paste0("record_", i), label = "Record", class = "btn-success")
+          actionButton(inputId = paste0("record_", i), label = "Record", class = "btn-primary")
         ),
         hr()
       )
@@ -972,18 +982,7 @@ server <- function(input, output, session) {
   })
   
   #Gemini ----
-  ### Google API key validation ----
-    ### Gemini observer to reset button state when API key changes ----
-  observeEvent(input$apiKey, {
-    if(validationStatus() != "pending") {
-      validationStatus("pending")
-      updateActionButton(session, "validateKey",
-                         label = "Validate Key",
-                         icon = icon("check"))
-      runjs("$('#validateKey').removeClass('validate-btn-success');")
-    }
-  })
-  
+
   ### Gemini model selection observer----
   observeEvent(input$modelSelect, {
     # Update rate limits when model changes
@@ -1055,7 +1054,12 @@ server <- function(input, output, session) {
     paste("Selected Model:", input$modelSelect)
   })
 
-  
+  # Create a reactive value to track successful model fetching  
+  output$modelsFetched <- reactive({  
+    # This will be TRUE when models are successfully fetched  
+    return(!is.null(input$modelSelect) && length(input$modelSelect) > 0)  
+  })  
+  outputOptions(output, "modelsFetched", suspendWhenHidden = FALSE)
   
   
   ### Gemini Save settings ----
@@ -1340,6 +1344,19 @@ PROMPTS:
   `%||%` <- function(x, y) if (is.null(x) || is.na(x)) y else x
   
   
+  
+  # Reset button styles when a new PDF is uploaded----  
+  observeEvent(input$pdfFile, {  
+    # Reset all record buttons to their original state  
+    for (i in seq_along(rv$prompts)) {  
+      # Reset to primary style  
+      shinyjs::removeClass(paste0("record_", i), "btn-secondary")  
+      shinyjs::addClass(paste0("record_", i), "btn-primary")  
+      
+      # Re-enable buttons if they were disabled  
+      shinyjs::enable(paste0("record_", i))  
+    }  
+  })
   
   #Analyze Button----
   observeEvent(input$analyzeBtn, {
@@ -1644,10 +1661,11 @@ PROMPTS:
       local({
         local_i <- i
         
+        # Observe button clicks
         observeEvent(input[[paste0("record_", local_i)]], {
           current_path <- original_file_path()
           req(current_path)
-          req(current_row())  # Make sure we have a current row
+          req(current_row())
           
           tryCatch({
             response <- input[[paste0("response_", local_i)]]
@@ -1662,7 +1680,6 @@ PROMPTS:
             
             # Make sure we have enough rows
             if (current_row() > nrow(coding_form_df)) {
-              # Add new rows if needed
               new_rows <- data.frame(matrix(NA, 
                                             nrow = current_row() - nrow(coding_form_df), 
                                             ncol = ncol(coding_form_df)))
@@ -1676,13 +1693,29 @@ PROMPTS:
             # Save directly to the original file
             write_xlsx(coding_form_df, current_path)
             
+            # Only change button color if we successfully reached this point
+            shinyjs::removeClass(paste0("record_", local_i), "btn-primary")
+            shinyjs::addClass(paste0("record_", local_i), "btn-secondary")
+            
+            # Optionally disable the button to prevent multiple submissions
+            shinyjs::disable(paste0("record_", local_i))
+            
             showNotification(paste("Response for Prompt", local_i, "recorded and saved successfully in row", current_row()), 
                              type = "message")
             
           }, error = function(e) {
+            # Keep the original button color if there's an error
             showNotification(paste("Error recording response:", e$message), type = "error")
           })
         })
+        
+        # Add observer for text input changes
+        observeEvent(input[[paste0("response_", local_i)]], {
+          # Reset button to original state when text is edited
+          shinyjs::removeClass(paste0("record_", local_i), "btn-secondary")
+          shinyjs::addClass(paste0("record_", local_i), "btn-primary")
+          shinyjs::enable(paste0("record_", local_i))
+        }, ignoreInit = TRUE)
       })
     }
   })
@@ -2028,137 +2061,6 @@ PROMPTS:
   
   #Mistral ----
   
-  ### Mistral API key validation ----
-  observeEvent(input$validateKeyMistral, {
-    req(input$apiKeyMistral)
-    req(input$modelSelectMistral)
-    
-    # Update button to loading state
-    validationStatusMistral("loading")
-    updateActionButton(session, "validateKeyMistral",
-                       label = "Validating...",
-                       icon = icon("spinner", class = "fa-spin"))
-    
-    # Show loading notification
-    id <- showNotification(
-      "Validating API key...", 
-      type = "default",
-      duration = NULL,
-      closeButton = FALSE
-    )
-    
-    # Validate the API key using a simple test request
-    tryCatch({
-      response <- httr::POST(
-        url = "https://api.mistral.ai/v1/chat/completions",
-        httr::add_headers(
-          "Authorization" = paste("Bearer", input$apiKeyMistral),
-          "Content-Type" = "application/json"
-        ),
-        body = jsonlite::toJSON(list(
-          model = input$modelSelectMistral,
-          messages = list(
-            list(
-              role = "user",
-              content = "Test API connection"
-            )
-          ),
-          max_tokens = 10  # Minimal response to speed up test
-        ), auto_unbox = TRUE),
-        httr::timeout(10)  # 10-second timeout
-      )
-      
-      # Check response
-      if (httr::status_code(response) == 200) {
-        removeNotification(id)
-        validationStatusMistral("success")
-        updateActionButton(session, "validateKeyMistral",
-                           label = "",
-                           icon = icon("check"))
-        
-        # More explicit JS to add success class and style
-        runjs("
-        $('#validateKeyMistral').addClass('validate-btn-success');
-        $('#validateKeyMistral').css({
-          'background-color': '#28a745',
-          'color': 'white',
-          'border-color': '#28a745'
-        });
-      ")
-        
-        showNotification(
-          "API key is valid!", 
-          type = "default",
-          duration = 5
-        )
-      } else {
-        removeNotification(id)
-        validationStatusMistral("failed")
-        updateActionButton(session, "validateKeyMistral",
-                           label = "Validate Key",
-                           icon = icon("check"))
-        
-        # Reset button style
-        runjs("
-        $('#validateKeyMistral').removeClass('validate-btn-success');
-        $('#validateKeyMistral').css({
-          'background-color': '',
-          'color': '',
-          'border-color': ''
-        });
-      ")
-        
-        # Try to get more information about the error
-        error_content <- tryCatch(
-          httr::content(response, "text", encoding = "UTF-8"),
-          error = function(e) "Unable to parse error response"
-        )
-        
-        showNotification(
-          paste("Invalid API key. Status:", httr::status_code(response), 
-                "Response:", error_content), 
-          type = "error",
-          duration = 5
-        )
-      }
-    }, error = function(e) {
-      removeNotification(id)
-      validationStatusMistral("failed")
-      updateActionButton(session, "validateKeyMistral",
-                         label = "Validate Key",
-                         icon = icon("check"))
-      
-      # Reset button style
-      runjs("
-      $('#validateKeyMistral').removeClass('validate-btn-success');
-      $('#validateKeyMistral').css({
-        'background-color': '',
-        'color': '',
-        'border-color': ''
-      });
-    ")
-      
-      # More detailed error handling
-      error_message <- if(inherits(e, "error")) {
-        if(grepl("Could not resolve host", e$message)) {
-          "Network error: Please check your internet connection"
-        } else if(grepl("Operation timed out", e$message)) {
-          "Request timed out. Please check your internet connection and try again."
-        } else {
-          paste("Error validating API key:", e$message)
-        }
-      } else {
-        "An unknown error occurred"
-      }
-      
-      showNotification(
-        error_message,
-        type = "error",
-        duration = 5
-      )
-    })
-  })
-  
   #### Fetch Mistral Models ----
   fetchModelsMistral <- function(apiKey) {
     url <- "https://api.mistral.ai/v1/models"
@@ -2241,6 +2143,13 @@ PROMPTS:
   output$apiResponse <- renderPrint({
     fetchModelsMistral(input$apiKeyMistral)
   })
+  
+  # Create a reactive value to track successful model fetching for Mistral  
+  output$modelsFetchedMistral <- reactive({  
+    # This will be TRUE when models are successfully fetched  
+    return(length(models()) > 0)  
+  })  
+  outputOptions(output, "modelsFetchedMistral", suspendWhenHidden = FALSE)
   
   ##Mistral Analysis----
   analyze_with_mistral <- function(pdf_text, prompts, config, progress_callback = NULL) {  

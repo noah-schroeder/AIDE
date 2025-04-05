@@ -380,7 +380,7 @@ ui <- dashboardPage(title= "AI-Assisted Data Extraction",
                       )
                     ),
                     # Model selection
-                    actionButton("fetchModels", "Fetch Models"),
+                    actionButton("fetchModels", "Fetch Models", icon = icon("refresh")),
                     selectInput("modelSelect", "Select a Model",
                                 choices = character(0),
                                 selected = NULL,
@@ -463,14 +463,10 @@ ui <- dashboardPage(title= "AI-Assisted Data Extraction",
                       )
                     ),
                     # Model selection
-                    selectInput("modelSelectMistral", "Model",
-                                choices = c("mistral-large-latest", "pixtral-large-latest", "pixtral-12b-2409", "ministral-3b-latest", "ministral-8b-latest"),
-                                selected = tryCatch({
-                                  fresh_config <- read_config()
-                                  fresh_config$api$mistral$model
-                                }, error = function(e) {
-                                  "mistral-large-latest"
-                                }),
+                    actionButton("fetchModelsMistral", "Fetch Models", icon = icon("refresh")),
+                    selectInput("modelSelectMistral", "Select a Model",
+                                choices = character(0),
+                                selected = NULL,
                                 width = "400px"),
           
                     # Save Settings Button    
@@ -2161,6 +2157,89 @@ PROMPTS:
         duration = 5
       )
     })
+  })
+  
+  #### Fetch Mistral Models ----
+  fetchModelsMistral <- function(apiKey) {
+    url <- "https://api.mistral.ai/v1/models"
+    # Make the API request with the API key in the headers
+    response <- GET(url, add_headers(`Authorization` = paste("Bearer", apiKey)))
+    # Check if the request was successful
+    if (status_code(response) == 200) {
+      content <- content(response, as = "text", encoding = "UTF-8")
+      models_data <- fromJSON(content)
+      # Print the entire data structure for debugging
+      print("Entire data structure:")
+      print(models_data$data)
+      # Inspect the structure of models_data$data
+      str(models_data$data)
+      # Check if 'data' exists and extract the display names for the selectInput
+      if (!is.null(models_data$data) && nrow(models_data$data) > 0) {
+        # Print all model IDs for debugging
+        print("All model IDs:")
+        print(models_data$data$id)
+        # Filter models that end with "-latest"
+        latest_models <- models_data$data[grepl("-latest$", models_data$data$id, ignore.case = TRUE), ]
+        # Print filtered model IDs for debugging
+        print("Filtered model IDs:")
+        print(latest_models$id)
+        if (nrow(latest_models) > 0) {
+          model_choices <- setNames(latest_models$id, latest_models$id)
+          return(model_choices)
+        } else {
+          return(character(0))
+        }
+      } else {
+        return(character(0))
+      }
+    } else {
+      return(character(0))
+    }
+  }
+  
+  # Reactive value to store the models
+  models <- reactiveVal(character(0))
+  
+  # Observe the fetchModelsMistral button click
+  observeEvent(input$fetchModelsMistral, {
+    api_key <- input$apiKeyMistral
+    if (is.null(api_key) || api_key == "") {
+      showModal(modalDialog(
+        title = "Error",
+        "Please enter an API key.",
+        easyClose = TRUE,
+        footer = NULL
+      ))
+      return()
+    }
+    fetchedModels <- fetchModelsMistral(api_key)
+    if (length(fetchedModels) > 0) {
+      models(fetchedModels)
+    } else {
+      showModal(modalDialog(
+        title = "Warning",
+        "No models found in the API response.",
+        easyClose = TRUE,
+        footer = NULL
+      ))
+      # Optionally clear the modelSelect input
+      updateSelectInput(session, "modelSelectMistral", choices = character(0))
+    }
+  })
+  
+  # Update the modelSelectMistral input with the fetched models
+  observe({
+    updateSelectInput(session, "modelSelectMistral", choices = models())
+  })
+  
+  # Output the selected model for debugging
+  output$selectedModel <- renderText({
+    paste("Selected Model:", input$modelSelectMistral)
+  })
+  
+  # Output the API response for debugging
+  output$apiResponse <- renderPrint({
+    fetchModelsMistral(input$apiKeyMistral)
   })
   
   ##Mistral Analysis----

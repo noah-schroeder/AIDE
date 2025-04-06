@@ -436,7 +436,7 @@ ui <- dashboardPage(title= "AI-Assisted Data Extraction",
                   title = "Mistral API Notes",    
                   div(    
                     style = "display: flex; flex-direction: column; gap: 8px;",    
-                    p("1) Mistral has a very generous experimental/research API at the time this app was created (December, 2024). The full list of models is here:", HTML('<a href="https://docs.mistral.ai/getting-started/models/models_overview/" target="_blank" style="display: inline;">Mistral Models.</a>'), "We have only included models that have a 128K or larger context window."),
+                    p("1) Mistral has a very generous experimental/research API at the time this app was created (December, 2024). The full list of models is here:", HTML('<a href="https://docs.mistral.ai/getting-started/models/models_overview/" target="_blank" style="display: inline;">Mistral Models.</a>')),
                     p("2) Since we are sending text data only, and at least as of December 2024 Mistral allowed those with free API key usage to use all models, we recommend using Mistral Large or Mistral Small"),    
                     strong("It won't fetch models, what do I do?"),
                     p("Check that you've entered the API key correctly without any extra spaces. Check at the end of the key - it is very easy to introduce a space at the end of the key."),

@@ -1224,8 +1224,7 @@ PROMPTS:
       generationConfig = list(
         temperature = 0.1,
         topK = 1,
-        topP = 1,
-        maxOutputTokens = 8192
+        topP = 1
       )
     )
     # --- Debugging: Print the JSON Payload ---
@@ -2619,8 +2618,7 @@ IMPORTANT: For EACH prompt, you must provide:
           )
         )
       ),
-      temperature = 0.1,
-      max_tokens = 8192  # Increased token limit
+      temperature = 0.1
     )
     
     # Comprehensive API call with multiple error handling mechanisms

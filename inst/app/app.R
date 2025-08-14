@@ -2168,18 +2168,18 @@ PROMPTS:
     
     url <- sprintf("%s/chat/completions", base_url)  
     
-    # Ensure full PDF text is captured
-    full_pdf_text <- paste(pdf_text, collapse = "\n")
+    # Ensure full PDF text is captured  
+    full_pdf_text <- paste(pdf_text, collapse = "\n")  
     
-    # Debug: Print total PDF text length and first/last characters
+    # Debug: Print total PDF text length and first/last characters  
     total_pdf_text_length <- nchar(full_pdf_text)  
-    print(paste("Total PDF text length:", total_pdf_text_length, "characters"))
+    print(paste("Total PDF text length:", total_pdf_text_length, "characters"))  
     
-    # Print out the exact prompts for debugging
-    print("Exact Prompts:")
-    for (i in seq_along(prompts)) {
-      print(paste(i, ":", prompts[i]))
-    }
+    # Print out the exact prompts for debugging  
+    print("Exact Prompts:")  
+    for (i in seq_along(prompts)) {  
+      print(paste(i, ":", prompts[i]))  
+    }  
     
     # Construct payload with correct structure  
     payload <- list(  
@@ -2187,11 +2187,11 @@ PROMPTS:
       messages = list(  
         # Ensure each message is a list with explicit role and content  
         list(  
-          role = "system",   
+          role = "system",  
           content = "You are an expert PDF analyzer. You will process multiple prompts about this document."  
         ),  
         list(  
-          role = "user",   
+          role = "user",  
           content = sprintf("Analyze this PDF text and answer ALL of the following prompts:  
   
 PDF TEXT:  
@@ -2206,142 +2206,159 @@ For EACH prompt, provide:
 - SOURCE: [exact supporting text from PDF, if applicable]  
 - PAGE: [page number where source appears]  
   
-If no direct source is found, explain your reasoning.",   
-                            full_pdf_text,   
+If no direct source is found, explain your reasoning.",  
+                            full_pdf_text,  
                             paste(prompts, collapse = "\n")  
           )  
-        )
+        )  
       ),  
       temperature = 0.1,  
       max_tokens = 128000  # Increased token limit  
-    )
+    )  
     
-    # Comprehensive API call with multiple error handling mechanisms
-    result <- tryCatch({
-      # Use httr2 for more robust request handling
-      req <- httr2::request(url) %>%
-        httr2::req_method("POST") %>%
-        httr2::req_headers(
-          "Content-Type" = "application/json",
-          "Authorization" = paste("Bearer", api_key)
-        ) %>%
-        httr2::req_body_json(payload) %>%
-        httr2::req_timeout(300)  # 5-minute timeout
+    # Comprehensive API call with multiple error handling mechanisms  
+    result <- tryCatch({  
+      # Use httr2 for more robust request handling  
+      req <- httr2::request(url) %>%  
+        httr2::req_method("POST") %>%  
+        httr2::req_headers(  
+          "Content-Type" = "application/json",  
+          "Authorization" = paste("Bearer", api_key)  
+        ) %>%  
+        httr2::req_body_json(payload) %>%  
+        httr2::req_timeout(300)  # 5-minute timeout  
       
-      # Perform the request with error tracking
-      resp <- httr2::req_perform(req)
+      # Perform the request with error tracking  
+      resp <- httr2::req_perform(req)  
       
-      # Parse response
-      response_content <- httr2::resp_body_json(resp)
+      # Parse response  
+      response_content <- httr2::resp_body_json(resp)  
       
-      # Extract response text
-      response_text <- response_content$choices[[1]]$message$content
+      # Extract response text  
+      response_text <- response_content$choices[[1]]$message$content  
       
-      # Debug print
-      print("Response received successfully")
-      print("Full response text:")
-      print(response_text)
+      # Debug print  
+      print("Response received successfully")  
+      print("Full response text:")  
+      print(response_text)  
       
-      # Process responses with improved parsing
-      responses <- lapply(seq_along(prompts), function(i) {
-        # Call progress callback if provided
-        if (!is.null(progress_callback)) {
-          progress_callback(i, length(prompts))
-        }
+      # Helper to tidy up the strings we send back to the UI  
+      clean_field <- function(txt) {  
+        if (is.null(txt) || length(txt) == 0) return(NULL)  
+        txt <- sub("\\n{0,2}---\\s*$", "", txt)      # drop trailing "---"  
+        txt <- trimws(txt, which = "both")           # trim whitespace  
+        txt <- gsub('\\"', '"', txt, perl = TRUE)    # un‑escape quotes  
+        txt <- gsub("\\s+", " ", txt, perl = TRUE)  # collapse new‑lines  
+        txt  
+      }
+      
+      # Process responses with improved parsing  
+      responses <- lapply(seq_along(prompts), function(i) {  
+        # Call progress callback if provided  
+        if (!is.null(progress_callback)) {  
+          progress_callback(i, length(prompts))  
+        }  
         
-        # Improved parsing logic
-        prompt <- prompts[i]
+        # Improved parsing logic  
+        prompt <- prompts[i]  
         
-        # Print debug information for each prompt
-        print(paste("Processing prompt", i, ":", prompt))
+        # Print debug information for each prompt  
+        print(paste("Processing prompt", i, ":", prompt))  
         
-        # Split the response text into sections
-        response_sections <- strsplit(response_text, "### PROMPT: ")[[1]]
+        # Split the response text into sections  
+        response_sections <- strsplit(response_text, "\\*\\*PROMPT:\\*\\*")[[1]]  
         
-        # Skip the first element (which is empty or contains text before first prompt)
-        response_sections <- response_sections[-1]
+        # Skip the first element (which is empty or contains text before first prompt)  
+        response_sections <- response_sections[-1]  
         
-        # Find the matching section
-        matching_section <- NULL
-        for (section in response_sections) {
-          # Check if the section starts with the current prompt
-          if (startsWith(section, prompt)) {
-            matching_section <- section
-            break
-          }
-        }
+        # Find the matching section using substring matching  
+        matching_section <- NULL  
+        for (section in response_sections) {  
+          # Clean up the section and prompt for comparison  
+          section_clean <- trimws(section)  
+          prompt_clean <- trimws(prompt)  
+          
+          # Check if the section starts with the current prompt (first 50 characters for safety)  
+          section_start <- substr(section_clean, 1, min(nchar(prompt_clean), nchar(section_clean)))  
+          if (section_start == substr(prompt_clean, 1, nchar(section_start))) {  
+            matching_section <- section  
+            break  
+          }  
+        }  
         
-        if (!is.null(matching_section)) {
-          print("Matched prompt section:")
-          print(matching_section)
+        if (!is.null(matching_section)) {  
+          print("Matched prompt section:")  
+          print(matching_section)  
           
-          # Manual parsing of answer, source, and page
-          # Extract answer
-          answer_start <- regexpr("\\*\\*ANSWER:\\*\\*", matching_section)
-          source_start <- regexpr("\\*\\*SOURCE:\\*\\*", matching_section)
-          page_start <- regexpr("\\*\\*PAGE:\\*\\*", matching_section)
+          # Manual parsing of answer, source, and page  
+          # Extract answer  
+          answer_start <- regexpr("\\*\\*ANSWER:\\*\\*", matching_section)  
+          source_start <- regexpr("\\*\\*SOURCE:\\*\\*", matching_section)  
+          page_start <- regexpr("\\*\\*PAGE:\\*\\*", matching_section)  
           
-          answer <- if (answer_start > 0) {
-            end_pos <- if (source_start > 0) source_start else 
-              if (page_start > 0) page_start else nchar(matching_section)
-            trimws(substr(matching_section, 
-                          answer_start + attr(regexpr("\\*\\*ANSWER:\\*\\*", matching_section), "match.length"),
-                          end_pos - 1))
-          } else "No answer found"
+          answer <- if (answer_start > 0) {  
+            end_pos <- if (source_start > 0) source_start else  
+              if (page_start > 0) page_start else nchar(matching_section)  
+            trimws(substr(matching_section,  
+                          answer_start + attr(regexpr("\\*\\*ANSWER:\\*\\*", matching_section), "match.length"),  
+                          end_pos - 1))  
+          } else "No answer found"  
           
-          # Extract source
-          source <- if (source_start > 0) {
-            page_start <- regexpr("\\*\\*PAGE:\\*\\*", matching_section)
-            end_pos <- if (page_start > 0) page_start else nchar(matching_section)
-            trimws(substr(matching_section, 
-                          source_start + attr(regexpr("\\*\\*SOURCE:\\*\\*", matching_section), "match.length"),
-                          end_pos - 1))
-          } else NULL
+          source <- if (source_start > 0) {  
+            end_pos <- if (page_start > 0) page_start else nchar(matching_section)  
+            trimws(substr(matching_section,  
+                          source_start + attr(regexpr("\\*\\*SOURCE:\\*\\*", matching_section), "match.length"),  
+                          end_pos - 1))  
+          } else NULL  
           
-          # Extract page
-          page <- if (page_start > 0) {
-            trimws(substr(matching_section, 
-                          page_start + attr(regexpr("\\*\\*PAGE:\\*\\*", matching_section), "match.length"),
-                          nchar(matching_section)))
-          } else "N/A"
+          page <- if (page_start > 0) {  
+            trimws(substr(matching_section,  
+                          page_start + attr(regexpr("\\*\\*PAGE:\\*\\*", matching_section), "match.length"),  
+                          nchar(matching_section)))  
+          } else "N/A"  
           
-          return(list(
-            answer = answer,
-            source = source,
-            page = page
-          ))
-        } else {
-          print(paste("No section found for prompt:", prompt))
-          print("Debugging details:")
-          print("Available sections:")
-          for (j in seq_along(response_sections)) {
-            print(paste(j, ":", substr(response_sections[j], 1, 100)))
-          }
+          # ---- CLEAN THE FIELDS BEFORE RETURNING ----  
+          answer <- clean_field(answer)  
+          source <- clean_field(source)  
+          page   <- clean_field(page)
           
-          return(list(
-            answer = "No response found for this prompt",
-            source = NULL,
-            page = NULL
-          ))
-        }
-      })
+          return(list(  
+            answer = answer,  
+            source = source,  
+            page = page  
+          ))  
+        } else {  
+          print(paste("No section found for prompt:", prompt))  
+          print("Debugging details:")  
+          print("Available sections:")  
+          for (j in seq_along(response_sections)) {  
+            print(paste(j, ":", substr(response_sections[j], 1, 100)))  
+          }  
+          
+          return(list(  
+            answer = "No response found for this prompt",  
+            source = NULL,  
+            page = NULL  
+          ))  
+        }  
+      })  
       
-      return(responses)
+      return(responses)  
       
-    }, error = function(e) {
-      # Comprehensive error handling
-      print("Critical error in Mistral API call:")
-      print(e$message)
+    }, error = function(e) {  
+      # Comprehensive error handling  
+      print("Critical error in Mistral API call:")  
+      print(e$message)  
       
-      # Return placeholder responses
-      return(lapply(prompts, function(x) list(
-        answer = paste("API Error:", e$message),
-        source = NULL,
-        page = NULL
-      )))
-    })
+      # Return placeholder responses  
+      return(lapply(prompts, function(x) list(  
+        answer = paste("API Error:", e$message),  
+        source = NULL,  
+        page = NULL  
+      )))  
+    })  
     
-    return(result)
+    return(result)  
   }
   
   ### Mistral Save settings ----
